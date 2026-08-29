@@ -1,0 +1,74 @@
+generated: '2026-08-29'
+method: derived
+source: mcp/superdial-tools-list.json + openapi/superdial-api-openapi.yml
+summary: >-
+  SuperDial ships both a REST OpenAPI and a hosted MCP server, but they are disjoint surfaces. The
+  MCP server is a documentation search/read server; the REST API is the operational surface. Not
+  one MCP tool binds to a REST operation, and not one REST operation is reachable as a tool. An
+  agent can READ everything about SuperDial through MCP and DO nothing through it.
+surfaces:
+  openapi:
+    path: openapi/superdial-api-openapi.yml
+    servers: [https://robodialer-service-api-9nc4t1p9.uc.gateway.dev]
+    gated: true
+    gate: Bearer token from GET /v1/auth, exchanged for an account API key + secret
+  mcp:
+    url: https://docs.superdial.com/mcp
+    gated: false
+    note: Answers tools/list anonymously.
+  graphql:
+    present: false
+crosswalk: []
+mcp_only:
+- tool: search_super_dial_api
+  reason: >-
+    Documentation search over the Mintlify-indexed docs corpus. No REST operation backs it; there
+    is no public search endpoint on the SuperDial API.
+- tool: query_docs_filesystem_super_dial_api
+  reason: >-
+    Read-only virtual filesystem over documentation pages and the OpenAPI spec. Docs-plane only.
+- tool: submit_feedback
+  reason: >-
+    Writes documentation feedback to the docs platform, not to the SuperDial API. This is the only
+    non-read-only tool on the server and it does not touch any SuperDial account resource.
+rest_only:
+- operation: GET /v1/auth
+  summary: Authenticate and get token
+  reason: No MCP tool exposes credential exchange.
+- operation: GET /v1/schemas
+  summary: List schemas
+  reason: >-
+    Schema discovery is account-scoped and only available over REST. An agent cannot learn which
+    schemas an account has through MCP.
+- operation: GET /v1/schemas/{schemaId}/required-inputs
+  summary: Required inputs for a schema
+  reason: Account-scoped; REST only.
+- operation: POST /v1/schemas/{schemaId}/required-payer-inputs
+  summary: Resolve payer names against a schema's required inputs
+  reason: Account-scoped; REST only.
+- operation: POST /v1/requests
+  summary: Create a Request
+  reason: >-
+    The primary write operation — it places real outbound phone calls to insurance payers. Not
+    exposed through MCP.
+- operation: GET /v1/requests
+  summary: List Requests
+  reason: Account-scoped; REST only.
+- operation: GET /v1/requests/{requestId}
+  summary: Retrieve a Request
+  reason: Account-scoped; REST only.
+coverage:
+  mcp_tools: 3
+  rest_operations: 7
+  bound: 0
+  mcp_only: 3
+  rest_only: 7
+  binding_rate: 0.0
+notes:
+- >-
+  Operation identity here is `METHOD /path` because the SuperDial OpenAPI declares NO
+  `operationId` on any of its seven operations. That is a real contract-quality gap: every
+  generated client, every tool binding, and every crosswalk has to fall back to method+path.
+- >-
+  Confidence on the divergence is high — it was established by probing the live MCP server
+  anonymously and reading the full tool list, not inferred from prose.

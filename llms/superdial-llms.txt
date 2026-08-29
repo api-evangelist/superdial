@@ -1,0 +1,27 @@
+# SuperDial API
+
+> Submit requests and retrieve results programmatically.
+
+## Docs
+
+- [SuperDial API](https://docs.superdial.com/introduction.md): Submit requests and retrieve results programmatically.
+- [Concepts & Glossary](https://docs.superdial.com/guides/concepts.md): Definitions for the core terms used throughout the SuperDial API.
+- [Sandbox](https://docs.superdial.com/guides/sandbox.md): Test your integration end-to-end without placing real phone calls.
+- [Creating a Request](https://docs.superdial.com/guides/creating-a-request.md): Submit a single request or a batch of requests with POST /v1/requests.
+- [Input Validation](https://docs.superdial.com/guides/input-validation.md): The per-field rules applied to inputs when you create a request, and the errors they produce.
+- [Reading Requests](https://docs.superdial.com/guides/reading-requests.md): Fetch a single request by ID, or list requests filtered by date or batch.
+- [Webhooks](https://docs.superdial.com/guides/webhooks.md): Receive request results when they reach a terminal state.
+- [Schemas](https://docs.superdial.com/guides/schemas.md): Discover the schemas provisioned for your account and the input keys each one requires.
+- [Payer Phone Number Lookup](https://docs.superdial.com/guides/payer-resolution.md): How payerName resolves to a phone number on POST /v1/requests.
+- [Per-Payer Required Inputs](https://docs.superdial.com/guides/payer-required-inputs.md): Some payers require additional inputs on POST /v1/requests.
+- [Authenticate and get token](https://docs.superdial.com/api-reference/authentication/authenticate-and-get-token.md): Returns a short-lived bearer token for use in API calls. The API key and API secret are **two distinct values** issued together: the key identifies your account, the secret authenticates the request.
+- [List schemas](https://docs.superdial.com/api-reference/schemas/list-schemas.md): Returns the schemas provisioned for your account. Each row carries a `requestType` (e.g. `claim-status`, `vob`) that identifies the kind of extraction the schema performs. Schemas that are no longer accessible for your account are filtered out.
+- [Required inputs for a schema](https://docs.superdial.com/api-reference/schemas/required-inputs-for-a-schema.md): Returns the input keys required and optionally accepted to submit a request against this schema. Field names are returned verbatim. Use them as the keys of the `inputs` object on `POST /v1/requests`. Lists are sorted. This is the baseline: if your account is enabled for per-payer required inputs, so…
+- [Resolve payer names against a schema's required inputs](https://docs.superdial.com/api-reference/schemas/resolve-payer-names-against-a-schemas-required-inputs.md): Given a schema and a batch of payer names, returns the schema's own required/optional inputs **plus** the per-payer required inputs for each name, so you can assemble the complete input set for a specific payer *before* calling `POST /v1/requests`, instead of discovering a payer-specific field from…
+- [List Requests](https://docs.superdial.com/api-reference/requests/list-requests.md): Retrieve requests filtered by date range or batch ID.
+- [Create a Request](https://docs.superdial.com/api-reference/requests/create-a-request.md): Submit a single request or a batch of requests. For batch, wrap in `{"requests": [...]}`. If `internalId` is supplied on a single request, a duplicate POST with the same `internalId` returns the previously reserved `requestId` rather than creating a new one.
+- [Retrieve a Request](https://docs.superdial.com/api-reference/requests/retrieve-a-request.md): Fetch details for a request by ID.
+
+## OpenAPI Specs
+
+- [openapi](https://docs.superdial.com/openapi.json)

@@ -1,0 +1,33 @@
+generated: '2026-08-29'
+method: searched
+source: registry searches across npm, PyPI, RubyGems, crates.io + GitHub + the SuperDial docs
+package_count: 0
+official_sdk_count: 0
+packages: []
+registries_searched:
+- {registry: npm, query: 'https://registry.npmjs.org/-/v1/search?text=superdial', status: 200, results: 0}
+- {registry: pypi, query: 'https://pypi.org/pypi/superdial/json', status: 404}
+- {registry: pypi, query: 'https://pypi.org/pypi/superdial-python/json', status: 404}
+- {registry: pypi, query: 'https://pypi.org/pypi/superdial-sdk/json', status: 404}
+- {registry: rubygems, query: 'https://rubygems.org/api/v1/gems/superdial.json', status: 404}
+- {registry: crates, query: 'https://crates.io/api/v1/crates/superdial', status: 403}
+- {registry: github, query: 'https://api.github.com/search/repositories?q=superdial', status: 200, results: '27 repositories, none owned by SuperDial — all unrelated projects (dialog widgets, dialogue segmentation, ESP32 display dials)'}
+- {registry: github-org, query: 'https://github.com/superdial', status: 404, note: 'No SuperDial GitHub organization exists'}
+findings:
+- >-
+  SuperDial publishes NO client libraries in any package registry, and has no GitHub organization.
+  Every code sample in the documentation is raw HTTP — Python `requests` and Node `fetch`/`crypto`
+  written inline, not an SDK call.
+- >-
+  This is a deliberate-looking posture rather than an oversight: the API is small (7 operations,
+  one write), the docs are thorough, and the samples are complete enough to integrate from
+  directly. But it means every consumer hand-rolls token refresh, webhook signature verification,
+  batch splitting and the read-after-write retry — all of which are documented hazards an SDK
+  would otherwise absorb.
+- >-
+  Absence of an SDK also removes the strongest available decay signal: there is no published
+  release date anywhere to compare against the API's own version.
+notes:
+- >-
+  version and published are recorded as null across the board because there is no package to read
+  metadata from — checked, nothing to record.

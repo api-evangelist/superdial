@@ -1,0 +1,70 @@
+generated: '2026-08-29'
+method: probed
+source: https://docs.superdial.com/.well-known/agent-card.json
+name: SuperDial API Agent Card
+discovery:
+  path: /.well-known/agent-card.json
+  canonical: true
+  host: docs.superdial.com
+x-evidence:
+  fetched: '2026-08-29'
+  url: https://docs.superdial.com/.well-known/agent-card.json
+  http_status: 200
+  content_type: application/json
+card:
+  file: a2a/superdial-agent-card.json
+  name: SuperDial API
+  description: Submit requests and retrieve results programmatically.
+  version: '1.0.0'
+  protocol_version: '0.3'
+  preferred_transport: HTTP+JSON
+  url: https://docs.superdial.com/
+  documentation_url: https://docs.superdial.com/
+  provider_organization: SuperDial API
+  capabilities:
+    streaming: false
+    push_notifications: false
+  default_input_modes: [text/plain]
+  default_output_modes: [text/plain]
+  skills:
+  - id: super-dial
+    name: Super Dial
+    url: https://docs.superdial.com/.well-known/agent-skills/super-dial/skill.md
+    description: >-
+      Submitting structured data extraction requests to insurance payers, managing phone-based and
+      digital workflows, handling webhook callbacks, and retrieving claim status, benefits
+      verification, prior authorization and other payer data.
+grade: conformant
+grade_basis: >-
+  Graded against A2A 1.0.0. Hard checks all pass: `capabilities` is an OBJECT, `protocolVersion` is
+  present, and `skills` is an ARRAY. The optional fields that commonly decide near-conformant are
+  also all present: `preferredTransport`, `defaultInputModes`, `defaultOutputModes`.
+deviations:
+- field: protocolVersion
+  observed: '0.3'
+  note: >-
+    Declares the 0.3 protocol line rather than 1.0.0. Present and well-formed, so not a hard
+    failure, but a consuming agent should not assume 1.0 semantics.
+- field: url / supportedInterfaces
+  observed: https://docs.superdial.com/
+  note: >-
+    The advertised interface URL is the documentation site root, not a callable A2A JSON-RPC
+    endpoint. The card is a documentation-derived descriptor: it makes SuperDial discoverable and
+    points at a real skill and a real MCP server, but there is no A2A task endpoint behind it.
+- field: skills[0].tags
+  observed: []
+  note: Empty tags array; the skill carries no routing tags for agent selection.
+- field: capabilities.streaming / pushNotifications
+  observed: false
+  note: >-
+    Both declared false. Notable given the underlying REST API is asynchronous and does ship real
+    webhook push — that capability is not represented through the agent card.
+notes:
+- >-
+  The card is published on the documentation host (docs.superdial.com), which is a Mintlify-hosted
+  docs site. It is served from a host SuperDial controls and describes SuperDial's own API, so it
+  counts as provider-published — but it is generated from the docs, which explains the docs-site
+  interface URL and the false capability flags.
+- >-
+  The card's skill URL resolves to a real, provider-published Agent Skill saved verbatim at
+  skills/superdial-super-dial.md.

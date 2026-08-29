@@ -1,0 +1,37 @@
+generated: '2026-08-29'
+method: searched
+source: https://www.superdial.com/ (footer "Security" link)
+present: true
+url: https://app.vanta.com/thesuperbill.com/trust/yxpg5guedf5rle15cka4ab
+platform: Vanta
+http_status: 200
+linked_from: https://www.superdial.com/ footer, labelled "Security"
+machine_readable: false
+readable_by_crawler: false
+evidence:
+- {url: 'https://app.vanta.com/thesuperbill.com/trust/yxpg5guedf5rle15cka4ab', status: 200, note: '5,362-byte JavaScript shell; no certification names present in the served HTML'}
+- {url: 'https://www.superdial.com/security', status: 404}
+- {url: 'https://www.superdial.com/trust', status: 404}
+certifications_claimed:
+- {name: HIPAA, source: SuperDial public statements and 2025 Series A press coverage}
+- {name: SOC 2 Type II, source: 'SuperDial public statements; audit reported completed November 2025'}
+- {name: HITRUST e1, source: SuperDial public statements}
+practices_claimed:
+- BAAs executed before PHI exchange
+- AES-256 encryption at rest
+- TLS in transit for voice recordings, transcripts and extracted PHI
+- SSO and MFA
+- Customer-specific data controls, vendor security reviews
+notes:
+- >-
+  A real, hosted trust center exists and is linked from the marketing footer — that part is
+  verified. What it lists could not be verified: the Vanta page renders entirely client-side, so a
+  crawler, an agent, or a procurement bot gets a 5KB empty shell.
+- >-
+  The trust center is registered under thesuperbill.com, the company's former name (SuperDial was
+  founded as SuperBill). A buyer verifying the vendor by domain will see a name that does not match
+  the product they are buying.
+- >-
+  SuperDial hosts no first-party security page at all — /security and /trust both 404 — so the
+  Vanta link is the only security surface, and its contents are unreadable to any non-browser
+  client.

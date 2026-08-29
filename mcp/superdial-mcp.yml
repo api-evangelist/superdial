@@ -1,0 +1,61 @@
+generated: '2026-08-29'
+method: probed
+source: https://docs.superdial.com/mcp (POST tools/list, HTTP 200, unauthenticated)
+name: SuperDial API Documentation MCP Server
+description: >-
+  SuperDial publishes a hosted, remote MCP server on its documentation host. It answers an
+  anonymous `tools/list` and exposes three tools. IMPORTANT: this is a DOCUMENTATION MCP server
+  (Mintlify-hosted) — it lets an agent search and read the SuperDial API docs. It does NOT expose
+  the SuperDial REST API operations as tools: an agent cannot submit a request, read a result, or
+  list schemas through it. The callable API surface remains the REST contract in openapi/.
+deployment:
+  mode: remote
+  endpoint: https://docs.superdial.com/mcp
+  auth: none
+  verified: probed
+transport:
+  protocol: streamable-http
+  response_format: text/event-stream
+  probe:
+    method: tools/list
+    http_status: 200
+    authenticated: false
+    fetched: '2026-08-29'
+tools_source: mcp/superdial-tools-list.json
+tool_count: 3
+tools:
+- name: search_super_dial_api
+  title: Search documentation
+  category: documentation
+  description: >-
+    Search across the SuperDial API knowledge base for relevant information, code examples, API
+    references, and guides.
+  input_schema:
+    query: {type: string, required: true, description: Search query}
+  annotations: {readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false}
+- name: query_docs_filesystem_super_dial_api
+  category: documentation
+  description: >-
+    Read-only shell-like query (rg, head, cat, ls, tree) against a virtualized in-memory filesystem
+    containing only the SuperDial documentation pages and OpenAPI specs. This is how a page is read
+    by path — there is no separate get-page tool.
+  input_schema:
+    command: {type: string, required: true, description: The shell-like read-only command to run}
+  annotations: {readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false}
+- name: submit_feedback
+  title: Submit documentation feedback
+  category: feedback
+  description: Submit feedback about a documentation page.
+  input_schema:
+    path: {type: string, required: true}
+    feedback: {type: string, required: true}
+  annotations: {readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true}
+notes:
+- >-
+  Zero of the three tools bind to a SuperDial REST operation — see mcp/superdial-tool-crosswalk.yml
+  for the full divergence. All seven REST operations are rest_only.
+- >-
+  The server is reachable anonymously, which is unusual and useful: an agent can read the entire
+  SuperDial API contract before it holds any credential.
+- >-
+  No local-stdio package is published; there is no npm or PyPI MCP package for SuperDial.

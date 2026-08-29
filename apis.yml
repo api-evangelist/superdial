@@ -1,18 +1,65 @@
 aid: superdial
 name: SuperDial
-description: 'SuperDial is a company surfaced via the API Evangelist harvest backlog (source: secondary-market)
-  and added to the network as a stub for full-pipeline profiling.'
+description: 'SuperDial builds voice AI agents that automate high-friction administrative phone calls
+  in healthcare revenue cycle management. Its agents place outbound calls from providers, billing teams
+  and RCM companies to insurance payers — navigating IVR phone trees, holding, and conducting live conversations
+  with payer representatives — and return structured, auditable results. Common workflows include benefits
+  verification, prior authorization, claim status, provider data validation, and credentialing and enrollment
+  outreach. The SuperDial API exposes this as an asynchronous job API: a client submits a "request" against
+  an account-provisioned schema, SuperDial fulfills it across digital and phone modalities, and delivers
+  the structured result by signed webhook or polling. Founded in 2021 in San Francisco as SuperBill by
+  Stanford classmates Sam Schwager and Harrison Caruthers, the company raised a $15M Series A led by SignalFire
+  in 2025.'
 url: https://raw.githubusercontent.com/api-evangelist/superdial/refs/heads/main/apis.yml
+image: https://cdn.prod.website-files.com/6a295c5ee7351e54c6d2a237/6a66f67df4c11ba71463b5e3_OG%20Superdial%20v2.png
 x-type: company
 x-source: harvest:secondary-market
-x-tier: stub
-x-tier-reason: harvest
 specificationVersion: '0.20'
 created: '2026-08-29'
 modified: '2026-08-29'
 tags:
 - Company
-apis: []
+- Healthcare
+- Revenue Cycle Management
+- Voice AI
+- Insurance
+- Artificial Intelligence
+- Claims
+- Prior Authorization
+- Benefits Verification
+- Automation
+apis:
+- name: SuperDial API
+  description: Asynchronous REST API for submitting structured data extraction requests against insurance
+    payers and retrieving the results. Submit a request (single or batch) against an account-provisioned
+    schema, discover the inputs a schema requires, resolve payer names to dialing numbers, and read results
+    by ID or by batch. Terminal results are delivered by an HMAC-SHA256-signed webhook. Auth is a short-lived
+    bearer token exchanged for an API key/secret pair.
+  humanURL: https://docs.superdial.com/introduction
+  baseURL: https://robodialer-service-api-9nc4t1p9.uc.gateway.dev
+  tags:
+  - Requests
+  - Schemas
+  - Authentication
+  - Webhooks
+  properties:
+  - type: OpenAPI
+    url: openapi/superdial-api-openapi.yml
+  - type: Documentation
+    url: https://docs.superdial.com/introduction
+  - type: APIReference
+    url: https://docs.superdial.com/api-reference/requests/create-a-request
+  - type: Overlay
+    url: overlays/superdial-api-overlay.yaml
+  - type: Webhooks
+    url: asyncapi/superdial-requests-webhooks.yml
+  - type: DataModel
+    url: data-model/superdial-data-model.yml
+  x-base-url-note: 'baseURL is a Google Cloud API Gateway managed host (*.uc.gateway.dev) running SuperDial''s
+    "robodialer-service-api". It is the real production base: the OpenAPI servers[] entry is labelled
+    "Production", all three sources (apis.yml, _original and refined spec) agree, and the documentation''s
+    own curl and Python examples call it directly. repair-api-bases.py flags it nonprod-host on the hostname
+    heuristic; that is a false positive for a GCP API Gateway deployment.'
 maintainers:
 - FN: Kin Lane
   email: kin@apievangelist.com
@@ -20,4 +67,65 @@ maintainers:
   email: info@apis.io
 common:
 - type: Website
-  url: https://www.nasdaqprivatemarket.com/
+  url: https://www.superdial.com/
+- type: DeveloperPortal
+  url: https://docs.superdial.com/introduction
+- type: Documentation
+  url: https://docs.superdial.com/introduction
+- type: APIReference
+  url: https://docs.superdial.com/api-reference/requests/create-a-request
+- type: GettingStarted
+  url: https://docs.superdial.com/guides/creating-a-request
+- type: Blog
+  url: https://www.superdial.com/blog
+- type: SignUp
+  url: https://app.thesuperbill.com/super-dial-sign-in
+- type: TermsOfService
+  url: https://www.superdial.com/terms
+- type: PrivacyPolicy
+  url: https://www.superdial.com/privacy
+- type: TrustCenter
+  url: https://app.vanta.com/thesuperbill.com/trust/yxpg5guedf5rle15cka4ab
+- type: Compliance
+  url: security/superdial-trust-center.yml
+- type: Authentication
+  url: authentication/superdial-authentication.yml
+- type: Conventions
+  url: conventions/superdial-conventions.yml
+- type: Idempotency
+  url: conventions/superdial-conventions.yml
+- type: ErrorCatalog
+  url: errors/superdial-problem-types.yml
+- type: ErrorCodes
+  url: errors/superdial-error-codes.yml
+- type: Lifecycle
+  url: lifecycle/superdial-lifecycle.yml
+- type: Sandbox
+  url: sandbox/superdial-sandbox.yml
+- type: Plans
+  url: plans/superdial-plans-pricing.yml
+- type: RateLimits
+  url: rate-limits/superdial-rate-limits.yml
+- type: Packages
+  url: packages/superdial-packages.yml
+- type: Conformance
+  url: conformance/superdial-conformance.yml
+- type: DomainSecurity
+  url: security/superdial-domain-security.yml
+- type: WellKnown
+  url: well-known/superdial-well-known.yml
+- type: LLMsTxt
+  url: llms/superdial-llms.txt
+- type: MCPServer
+  url: mcp/superdial-mcp.yml
+- type: ToolCrosswalk
+  url: mcp/superdial-tool-crosswalk.yml
+- type: AgentCard
+  url: a2a/superdial-a2a.yml
+- type: AgentSkill
+  url: skills/_index.yml
+x-enrichment:
+  date: '2026-08-29'
+  status: enriched
+  artifacts_added: 24
+  pass: local-v1

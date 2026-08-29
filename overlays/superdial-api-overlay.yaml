@@ -1,0 +1,77 @@
+overlay: 1.0.0
+info:
+  title: API Evangelist enhancements for the SuperDial API
+  version: 1.0.0
+extends: ../openapi/superdial-api-openapi.yml
+x-generated: '2026-08-29'
+x-method: generated
+x-source: >-
+  Derived from the SuperDial documentation set (https://docs.superdial.com/llms.txt) and applied as
+  an Overlay so the harvested specification at openapi/_original/ is never mutated.
+actions:
+- target: $.info
+  description: Record contact and documentation references absent from the published spec.
+  update:
+    contact:
+      name: SuperDial
+      url: https://docs.superdial.com/introduction
+    x-documentation: https://docs.superdial.com/introduction
+    x-llms-txt: https://docs.superdial.com/llms.txt
+    x-legacy-documentation: https://superdial.readme.io/
+- target: $.paths['/v1/auth'].get
+  description: Add the operationId the published spec omits.
+  update:
+    operationId: authenticate
+    x-token-lifetime: 1 hour
+- target: $.paths['/v1/schemas'].get
+  update:
+    operationId: listSchemas
+- target: $.paths['/v1/schemas/{schemaId}/required-inputs'].get
+  update:
+    operationId: getSchemaRequiredInputs
+- target: $.paths['/v1/schemas/{schemaId}/required-payer-inputs'].post
+  update:
+    operationId: resolvePayerRequiredInputs
+    x-safe: true
+    x-note: POST verb but read-only — resolves payer required inputs without changing state.
+- target: $.paths['/v1/requests'].post
+  description: >-
+    Mark the single write operation with its idempotency mechanism, its real-world consequence, and
+    the absence of any reversal path.
+  update:
+    operationId: createRequest
+    x-idempotency:
+      supported: true
+      key_field: internalId
+      key_location: body
+      scope: per-request
+      server_managed_default: true
+      silent_on_reuse: true
+    x-consequence:
+      class: external-side-effect
+      description: >-
+        Places a real outbound telephone call to an insurance payer, disclosing member and provider
+        identifiers. Billable per call.
+      reversible: false
+      reversal_operation: null
+      rehearsal: sandbox credentials (no real call dialed)
+- target: $.paths['/v1/requests'].get
+  update:
+    operationId: listRequests
+    x-pagination: none
+    x-note: Filtered by date range or batch; returns the full matched set with no paging.
+- target: $.paths['/v1/requests/{requestId}'].get
+  update:
+    operationId: getRequest
+    x-read-after-write-lag: >-
+      Can return 404 REQUEST_NOT_FOUND for a few seconds after a successful create. Tolerate this
+      when polling.
+- target: $.components.securitySchemes.bearerAuth
+  update:
+    x-obtained-from: GET /v1/auth
+    x-lifetime: 1 hour
+- target: $.components.schemas.RequestResponse.properties.results
+  description: Flag that the primary business payload is runtime-typed, not spec-typed.
+  update:
+    x-runtime-typed: true
+    x-schema-discovery: GET /v1/schemas/{schemaId}/required-inputs

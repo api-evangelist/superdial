@@ -1,0 +1,77 @@
+generated: '2026-08-29'
+method: searched
+source: https://docs.superdial.com/guides/concepts + https://docs.superdial.com/openapi.json
+docs:
+- https://docs.superdial.com/introduction
+- https://docs.superdial.com/guides/concepts#errorcode
+versioning:
+  scheme: uri-path
+  current: v1
+  spec_version: 1.0.0
+  published_policy: false
+  note: Every operation is under /v1/. No version negotiation header and no dated-version scheme.
+deprecation:
+  policy_published: false
+  sunset_header: false
+  deprecation_header: false
+  rfc8594: false
+  deprecated_operations: []
+  note: >-
+    No deprecation policy, no RFC 8594 Sunset/Deprecation headers, and no operation is marked
+    deprecated in the OpenAPI. The only forward-compatibility commitment published anywhere is a
+    narrow one about the error taxonomy.
+  partial_commitment:
+    scope: errorCode registry only
+    statement: >-
+      "Existing codes won't be renamed. New codes may be introduced... When bucketing for
+      analytics, default unknown values to OTHER rather than dropping the row."
+    source: https://docs.superdial.com/guides/concepts#errorcode
+    assessment: >-
+      A real, useful stability guarantee — but it covers the error enum only, not endpoints,
+      request shapes or response fields.
+  schema_retirement:
+    mechanism: account-scoped
+    description: >-
+      Individual schemas CAN be retired: GET /v1/schemas filters out schemas no longer accessible
+      for the account, and a retired schemaId returns 404 SCHEMA_NOT_FOUND. This is per-account
+      lifecycle managed by SuperDial, not a published API deprecation process, and there is no
+      documented notice period.
+status_page:
+  present: false
+  url: null
+  probed:
+  - {url: 'https://status.superdial.com/', status: '000 (DNS does not resolve)'}
+  note: >-
+    No status page found. status.superdial.com does not resolve, and neither the documentation
+    site nor the marketing site links one. For an API whose failure mode is silent — an unplaced
+    phone call — the absence of a public status surface is a material gap.
+sla:
+  published: false
+  note: >-
+    No public SLA. Completion time is explicitly variable: "electronic-only requests can finish
+    quickly; phone-backed requests depend on payer responsiveness and hold times."
+  soft_commitments:
+  - {name: webhook retry, value: '4 attempts total (1 + 3 retries), exponential backoff 0.5s -> 1s -> 2s, on 5xx or connection failure only'}
+  - {name: webhook consumer timeout, value: 10 seconds — the receiving endpoint must ack within this}
+  - {name: bearer token lifetime, value: 1 hour}
+  - {name: scheduling horizon, value: 'batch scheduling attempts placement within 365 days; overflow returns 400 INVALID_REQUEST'}
+changelog:
+  published: false
+  probed:
+  - {url: 'https://docs.superdial.com/changelog', status: 404}
+  note: >-
+    No dated changelog on the documentation site and none indexed in llms.txt (17 pages, none a
+    changelog or release-notes page). No ChangeLog pointer is emitted.
+legacy_documentation:
+  url: https://superdial.readme.io/
+  status: 200
+  note: >-
+    A previous-generation ReadMe-hosted documentation site is still live and is linked from the
+    current docs introduction as "legacy". Two live documentation surfaces describing the same API
+    is a discoverability hazard — an agent or developer landing on the ReadMe site gets the older
+    contract with no banner in the page title indicating it is superseded.
+maturity:
+  stage: production
+  evidence:
+  - Company reports tens of thousands of calls per week and seven-figure revenue since launching end of 2023.
+  - Sandbox, webhook signing, idempotency and a batch surface are all documented and shipped.

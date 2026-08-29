@@ -1,0 +1,155 @@
+generated: '2026-08-29'
+method: searched
+source: https://docs.superdial.com/guides/concepts#errorcode
+docs:
+- https://docs.superdial.com/guides/concepts#error-object
+- https://docs.superdial.com/guides/concepts#errorcode
+description: >-
+  SuperDial's BUSINESS-outcome error registry, carried on the request object itself, not on the
+  HTTP response. A request that failed to obtain data from the payer still returns HTTP 200 on
+  GET /v1/requests/{requestId}; the failure is described by state FAILURE plus a structured
+  `error` object. This is the non-payments sibling of a decline-code catalog: it says why the
+  payer call did not produce an answer.
+envelope:
+  location: RequestResponse.error (null on PROCESSING, SUCCESS and PARTIAL)
+  fields:
+  - {name: errorCategory, type: enum, description: Two-bucket category — NOT_FOUND or SYSTEM_ERROR.}
+  - {name: errorCode, type: enum, description: Machine-readable failure code within the category. Dispatch on this.}
+  - {name: errorMessage, type: string, description: Human-readable sentence. Wording may change between releases — do not match on it.}
+categories:
+- id: NOT_FOUND
+  meaning: The payer could not find what you asked about.
+- id: SYSTEM_ERROR
+  meaning: Any other failure — IVR navigation, payer refusal, unreachable, etc.
+stability: >-
+  Existing codes will not be renamed. New codes may be introduced — new *_MISSING or *_INCORRECT
+  codes appear when new schemas reference new fields. When bucketing for analytics, default unknown
+  values to OTHER rather than dropping the row.
+system_error_codes:
+- code: IVR_FAILURE
+  meaning: Could not navigate the payer's phone system to reach a representative (no rep-routing option, dead-end menus).
+- code: PAYER_REFUSAL
+  meaning: Representative refused to provide the information — declined to interact with an automated agent, declined to speak with a third party, or refused the specific query.
+- code: UNABLE_TO_REACH_HUMAN_IN_TIME
+  meaning: Could not connect to a representative within the per-request retry budget — voicemail-only line, hold time exceeded, repeated long waits.
+- code: REQUIRES_OTHER_CHANNEL
+  meaning: Payer requires the request through portal, fax, email, or another channel SuperDial does not currently support.
+- code: MATCHED_PHONE_NUMBER_INCORRECT
+  meaning: SuperDial dialed a number from a payer-directory match or agent lookup and that number was incorrect. Attributed to SuperDial, not to your input.
+- code: OTHER
+  meaning: A SYSTEM_ERROR that did not fit a more specific code. Inspect errorMessage.
+not_found_entity_codes:
+- {code: MEMBER_NOT_FOUND, meaning: Member could not be located from the supplied identifiers.}
+- {code: PROVIDER_NOT_FOUND, meaning: Provider could not be located.}
+- {code: CLAIM_NOT_FOUND, meaning: Claim could not be located.}
+- {code: PRIOR_AUTH_NOT_FOUND, meaning: Prior authorization could not be located.}
+- {code: APPEAL_NOT_FOUND, meaning: Appeal could not be located.}
+- {code: OTHER, meaning: NOT_FOUND failure where no specific entity / *_MISSING / *_INCORRECT code fits.}
+not_found_missing_input_codes:
+  pattern: '{FIELD}_MISSING'
+  meaning: A required input was not supplied with the request.
+  codes:
+  - CLAIM_NUMBER_MISSING
+  - CLAIM_AUTHORIZATION_NUMBER_MISSING
+  - CLAIM_CPT_PROCEDURE_CODE_MISSING
+  - CLAIM_DATE_OF_SERVICE_MISSING
+  - CLAIM_DIAGNOSIS_MISSING
+  - CLAIM_EFT_CHECK_NUMBER_MISSING
+  - MEMBER_GROUP_MISSING
+  - MEMBER_PATIENT_LOCATION_MISSING
+  - MEMBER_PATIENT_PHONE_MISSING
+  - MEMBER_PAYER_SPECIFIC_PATIENT_ID_MISSING
+  - MEMBER_POLICY_NUMBER_MISSING
+  - MEMBER_SSN_MISSING
+  - PROVIDER_CALLBACK_NUMBER_MISSING
+  - PROVIDER_FACILITY_INFO_MISSING
+  - PROVIDER_FACILITY_LOCATION_MISSING
+  - PROVIDER_FAX_MISSING
+  - PROVIDER_OTHER_LICENSING_MISSING
+  - PROVIDER_PTAN_MISSING
+  - PROVIDER_SPECIALTY_MISSING
+not_found_incorrect_input_codes:
+  pattern: '{FIELD}_INCORRECT'
+  meaning: An input was supplied but did not match the payer's records.
+  codes:
+  - APPLICATION_ID_INCORRECT
+  - APPLICATION_SUBMISSION_METHOD_INCORRECT
+  - APPLICATION_SUBMITTED_DATE_INCORRECT
+  - APPLICATION_SUBMITTED_TO_INCORRECT
+  - BEGINNING_DATE_OF_SERVICE_INCORRECT
+  - BILLING_PROVIDER_ADDRESS_INCORRECT
+  - BILLING_PROVIDER_NAME_INCORRECT
+  - BILLING_PROVIDER_NPI_INCORRECT
+  - BILLING_PROVIDER_TAX_ID_INCORRECT
+  - CALLBACK_NUMBER_INCORRECT
+  - CLAIM_CHARGE_AMOUNT_INCORRECT
+  - CLAIM_SUBMITTED_DATE_INCORRECT
+  - CLEARINGHOUSE_CLAIM_ID_INCORRECT
+  - CLEARINGHOUSE_NAME_INCORRECT
+  - END_DATE_OF_SERVICE_INCORRECT
+  - FACILITY_NPI_INCORRECT
+  - FAX_NUMBER_INCORRECT
+  - GROUP_NUMBER_INCORRECT
+  - INPUT_PHONE_NUMBER_INCORRECT
+  - INTERNAL_CLAIM_ID_INCORRECT
+  - INTERNAL_ID_INCORRECT
+  - INTERNAL_PROVIDER_ID_INCORRECT
+  - INTERNAL_TAG_INCORRECT
+  - IS_PRIMARY_POLICY_INCORRECT
+  - MEDICATION_NAME_INCORRECT
+  - MEMBER_ADDRESS_INCORRECT
+  - MEMBER_DATE_OF_BIRTH_INCORRECT
+  - MEMBER_FIRST_NAME_INCORRECT
+  - MEMBER_ID_INCORRECT
+  - MEMBER_LAST_NAME_INCORRECT
+  - OFFICE_NPI_INCORRECT
+  - PATIENT_ADDRESS_INCORRECT
+  - PATIENT_DATE_OF_BIRTH_INCORRECT
+  - PATIENT_FIRST_NAME_INCORRECT
+  - PATIENT_LAST_NAME_INCORRECT
+  - PATIENT_PHONE_NUMBER_INCORRECT
+  - PATIENT_RELATIONSHIP_TO_MEMBER_INCORRECT
+  - PAYER_CLAIM_ID_INCORRECT
+  - PAYER_NAME_INCORRECT
+  - PHARMACY_NAME_INCORRECT
+  - PRACTICE_NPI_INCORRECT
+  - PRIOR_AUTH_ID_INCORRECT
+  - PROVIDER_SPECIALTY_INCORRECT
+  - PROVIDER_TYPE_INCORRECT
+  - PTAN_INCORRECT
+  - RENDERING_PROVIDER_ADDRESS_INCORRECT
+  - RENDERING_PROVIDER_FIRST_NAME_INCORRECT
+  - RENDERING_PROVIDER_LAST_NAME_INCORRECT
+  - RENDERING_PROVIDER_NPI_INCORRECT
+  - RENDERING_PROVIDER_PHONE_NUMBER_INCORRECT
+  - RENDERING_PROVIDER_SPECIALTY_INCORRECT
+  - REPRESENTATIVE_PHONE_NUMBER_INCORRECT
+  - SERVICE_STATE_INCORRECT
+  - TAX_ID_INCORRECT
+dialing_number_attribution:
+  description: >-
+    When a call fails because the dialed number was wrong, the code and category depend on where
+    that number came from, so responsibility is explicit in the data.
+  rules:
+  - {number_source: SuperDial payer-directory match or SuperDial-agent lookup, errorCategory: SYSTEM_ERROR, errorCode: MATCHED_PHONE_NUMBER_INCORRECT}
+  - {number_source: A number a representative referred us to on an earlier call, errorCategory: NOT_FOUND, errorCode: REPRESENTATIVE_PHONE_NUMBER_INCORRECT}
+  - {number_source: The number you supplied in inputs.phoneNumber or a configured override, errorCategory: NOT_FOUND, errorCode: INPUT_PHONE_NUMBER_INCORRECT}
+  legacy_note: >-
+    Older calls placed before this attribution shipped, or calls where the number's source was not
+    recorded, may still surface the generic PHONE_NUMBER_INCORRECT code — under SYSTEM_ERROR when
+    SuperDial looked up the number, otherwise NOT_FOUND. Handle both the generic and the
+    provenance-specific codes.
+counts:
+  system_error: 6
+  not_found_entity: 6
+  not_found_missing: 19
+  not_found_incorrect: 54
+  total: 85
+notes:
+- >-
+  This registry is unusually complete for a voice-AI provider: it distinguishes "the payer could
+  not find it" from "our automation failed", and it attributes a bad phone number to whichever
+  party supplied it. Both distinctions are directly actionable by an agent deciding whether to
+  retry, re-input, or escalate.
+- >-
+  HTTP-transport errors are captured separately in errors/superdial-problem-types.yml.

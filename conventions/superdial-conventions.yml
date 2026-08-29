@@ -1,0 +1,174 @@
+generated: '2026-08-29'
+method: searched
+source: https://docs.superdial.com/guides/creating-a-request
+docs:
+- https://docs.superdial.com/guides/creating-a-request
+- https://docs.superdial.com/guides/reading-requests
+- https://docs.superdial.com/guides/webhooks
+- https://docs.superdial.com/guides/concepts
+derived_from: openapi/superdial-api-openapi.yml
+auth:
+  style: bearer-token-from-key-exchange
+  description: >-
+    Two distinct values are issued together — an API key (identifies the account) and an API secret
+    (authenticates the request). Send both as the Robodialer-API-Key and Robodialer-API-Secret
+    headers to GET /v1/auth, receive a short-lived (1 hour) bearer token, then send
+    Authorization: Bearer <token> on every subsequent call.
+  token_lifetime: 1 hour
+  see: authentication/superdial-authentication.yml
+idempotency:
+  supported: true
+  mechanism: request-body field
+  field: internalId
+  header: null
+  scope: per-request (no batch-level key)
+  retention: not stated in the docs
+  behavior: >-
+    internalId IS the idempotency key. A POST /v1/requests that reuses an internalId already seen
+    does NOT create a new request — it returns the originally created requestId (and the original
+    payerLookup, if any). In batch submissions each entry with an internalId is independently
+    deduped.
+  server_side_default: >-
+    internalId is OPTIONAL. If omitted, SuperDial generates and maintains its own unique
+    idempotency key server-side, so retries are still de-duplicated for the caller. This is
+    notable — most APIs make the caller opt in to safe retries; SuperDial makes safe retries the
+    default and lets the caller supply their own key only for correlation.
+  hazard: >-
+    Because internalId is the idempotency key, reusing one is NOT an error and produces NO warning:
+    it silently returns the original request instead of starting new work. A caller who reuses a
+    batch label as internalId will place one call and think they placed many. Use a naturally
+    unique value (UUID or your own primary key).
+  webhook_side: >-
+    The same requestId may in rare cases be delivered more than once. Treat requestId as a dedup key
+    on the receiving side.
+pagination:
+  style: none
+  description: >-
+    GET /v1/requests is filtered, not paged. There is no limit, offset, page or cursor parameter and
+    no next-page field in the response — the full matched set is returned in a `requests` array.
+  filters:
+  - {param: dateFrom, format: YYYY-MM-DD, default: today UTC midnight, semantics: inclusive}
+  - {param: dateTo, format: YYYY-MM-DD, default: tomorrow UTC midnight, semantics: exclusive}
+  - {param: requestBatchId, format: string, default: none, semantics: 'bypasses the date defaults — returns all requests in the batch regardless of creation date'}
+  sort: dateCreated descending (most recent first)
+  precedence: When requestBatchId is provided, dateFrom and dateTo are ignored.
+  hazard: >-
+    With no pagination and no result cap documented, a wide dateFrom/dateTo window on a
+    high-volume account returns an unbounded array in a single response.
+field_expansion:
+  style: endpoint-tiered
+  description: >-
+    Not a sparse-fieldset parameter. Instead the list endpoint returns a REDUCED projection of the
+    same RequestResponse schema: it omits transcript, transcriptPostCall, recordingDownloadUrl,
+    callSteps, contributingCalls and resultSources. Fetch the single-request endpoint to get them.
+  account_gated_fields:
+  - {field: transcriptPostCall, note: per-account addition, absent unless enabled}
+  - {field: callFromNumber, note: per-account addition, absent unless enabled}
+  additive_guarantee: >-
+    Account-gated fields are additive — a response that omits them has the same shape as one
+    without them enabled, so a parser need not branch on account capability.
+metadata:
+  fields:
+  - {name: internalId, purpose: caller correlation ID, also the idempotency key, echoed on reads and webhooks}
+  - {name: internalTag, purpose: opaque caller tag (e.g. "march-batch"), echoed on reads and webhooks}
+  absent_key_semantics: >-
+    When internalId or internalTag was not supplied at create time, the key is ABSENT from the
+    webhook JSON object entirely — not null, not empty string. Parsers must test for key presence.
+request_id_tracing:
+  header: null
+  body_field: requestId
+  description: >-
+    No request-id response header is documented. Correlation is done through the body: requestId
+    (per request) and requestBatchId (per scheduled batch group).
+  hazard: >-
+    A single POST batch can be split across MULTIPLE requestBatchId values — entries scheduled for
+    the same business day share one, entries that spill to another day get another. Always read each
+    entry's requestBatchId from the response rather than assuming they match.
+versioning:
+  style: uri-path
+  current: v1
+  spec_version: 1.0.0
+  policy_published: false
+  see: lifecycle/superdial-lifecycle.yml
+error_envelope:
+  shape: '{ "error": "<CODE>", "message": "<text>", "details": {...} }'
+  uniform: true
+  exception: 401 is emitted by the Google Cloud API Gateway in a {code, message} shape
+  batch: 'HTTP 207 with per-entry bodies; failed entries carry the same envelope'
+  business_errors_separate: true
+  see:
+  - errors/superdial-problem-types.yml
+  - errors/superdial-error-codes.yml
+rate_limit_signaling:
+  headers_published: false
+  status_on_exhaustion: 400 (INVALID_REQUEST — scheduling capacity exceeded), not 429
+  description: >-
+    SuperDial does not publish per-second/per-minute request limits or RateLimit-* headers. The
+    real constraint is a DAILY CALL CAPACITY on the account, which is enforced at scheduling time:
+    a batch that cannot be placed comes back as a 400 INVALID_REQUEST.
+  see: rate-limits/superdial-rate-limits.yml
+async_semantics:
+  model: submit-then-await-terminal-state
+  states: [PROCESSING, SUCCESS, PARTIAL, FAILURE]
+  terminal: [SUCCESS, PARTIAL, FAILURE]
+  delivery: signed webhook (preferred) or polling GET /v1/requests/{requestId}
+  read_after_write_lag: >-
+    For a few seconds after a successful POST, a GET for the just-created requestId can return 404
+    REQUEST_NOT_FOUND. Pollers must tolerate this; the webhook flow sidesteps it.
+  see: asyncapi/superdial-requests-webhooks.yml
+dry_run_mode:
+  supported: true
+  mechanism: sandbox credentials (see sandbox/superdial-sandbox.yml)
+  note: >-
+    Not a per-request dry-run flag. Authenticating with a sandbox key/secret pair routes the whole
+    request through the sandbox path — identical validation, idempotency, scheduling and webhook
+    delivery, but no real phone call is dialed.
+reversibility:
+  applicable: true
+  grade: none
+  read_only_api: false
+  summary: >-
+    SuperDial's write surface has real-world consequence — POST /v1/requests causes an outbound
+    telephone call to be placed to an insurance payer on the caller's behalf, disclosing member and
+    provider identifiers to that payer. The published API surface has NO reversal operation of any
+    kind: there is no cancel, no delete, no void, no withdraw, and no abort. The seven documented
+    operations are one write and six reads.
+  write_surfaces:
+  - operation: POST /v1/requests
+    effect: >-
+      Creates one or more requests, schedules them against the account's daily call capacity, and
+      dispatches them across digital and/or phone modalities. Phone-backed requests place a real
+      outbound call to a payer.
+    reversal_operation: null
+    reversal_window: null
+    evidence: >-
+      No cancel/delete/void/reverse endpoint appears in the OpenAPI (openapi/_original/superdial-openapi.json,
+      7 operations) and none is described anywhere in the documentation set
+      (https://docs.superdial.com/llms.txt indexes 17 pages; none documents a reversal).
+  - operation: POST /v1/schemas/{schemaId}/required-payer-inputs
+    effect: Read-only resolution despite the POST verb — resolves payer names to their required inputs. No state change.
+    reversal_operation: na
+    reversal_window: na
+  mitigations_available:
+  - >-
+    The sandbox is the effective pre-flight: it runs the identical create path with no real call
+    dialed, so an agent can rehearse a submission before committing it.
+  - >-
+    POST /v1/schemas/{schemaId}/required-payer-inputs lets a caller resolve payer-specific required
+    inputs BEFORE creating requests, avoiding a reject-and-retry loop.
+  - >-
+    Idempotency-by-default means an accidental retry does not double-dial; but it also means the
+    caller cannot undo the first dial.
+  agent_guidance: >-
+    Treat POST /v1/requests as irreversible once accepted. An agent must confirm inputs before
+    submitting, because the only recourse after submission is to wait for the terminal state. Do
+    not assume a scheduled request (one with a future dueDate) can be pulled back — the docs do not
+    say it can.
+  note: >-
+    No reversal window is asserted here because SuperDial's documentation states none. Recording an
+    invented window would be worse than recording its absence.
+notes:
+- >-
+  Idempotency here is genuinely strong and worth calling out: it is on by default, server-managed
+  when the caller supplies nothing, and works per-entry inside batches. The one sharp edge is that
+  a reused key fails silently rather than erroring.

@@ -1,0 +1,144 @@
+generated: '2026-08-29'
+method: searched
+source: >-
+  https://docs.superdial.com/openapi.json + https://docs.superdial.com/guides/* +
+  https://www.superdial.com/ (footer Security link to the Vanta trust center)
+standards:
+- id: openapi
+  conforms: true
+  version: 3.0.0
+  evidence: >-
+    https://docs.superdial.com/openapi.json returns a valid OpenAPI 3.0.0 document with 7
+    operations across 6 paths, 17 component schemas, 3 securitySchemes and tag descriptions.
+- id: oauth2
+  conforms: false
+  evidence: >-
+    No OAuth 2.0. Auth is a proprietary key+secret exchange (GET /v1/auth) returning a bearer
+    token. No authorization server, no /.well-known/oauth-authorization-server (probed, 404 on all
+    three hosts), no scopes.
+- id: oidc
+  conforms: false
+  evidence: '/.well-known/openid-configuration probed on all three hosts, 404 everywhere.'
+- id: rfc9457
+  conforms: false
+  evidence: >-
+    Errors use a proprietary uniform envelope {error, message, details} with
+    application/json, not application/problem+json. The envelope is consistent and
+    well-documented but is not RFC 9457 Problem Details.
+- id: rfc9116
+  name: security.txt
+  conforms: false
+  evidence: '/.well-known/security.txt probed on www.superdial.com, docs.superdial.com and the API gateway host — 404 on all three.'
+- id: rfc9727
+  name: api-catalog
+  conforms: false
+  evidence: '/.well-known/api-catalog probed on all three hosts, 404 everywhere.'
+- id: rfc8594
+  name: sunset-header
+  conforms: false
+  evidence: No Sunset or Deprecation headers documented; no deprecation policy published.
+- id: idempotency
+  conforms: true
+  evidence: >-
+    Real idempotency on the single write operation. internalId is the idempotency key; a repeat POST
+    returns the original requestId rather than creating new work, per-entry inside batches. When the
+    caller omits internalId, SuperDial generates and maintains a server-side key so retries are
+    still deduped by default. Source https://docs.superdial.com/guides/creating-a-request#correlation-and-idempotency.
+  deviation: >-
+    Carried in the request body rather than the Idempotency-Key header of
+    draft-ietf-httpapi-idempotency-key-header, so it is idempotency in substance but not in the
+    emerging standard's form.
+- id: pagination
+  conforms: false
+  evidence: >-
+    GET /v1/requests is filtered by date or batch but not paged — no limit/offset/cursor parameter
+    and no next-page field.
+- id: webhook-signing
+  conforms: true
+  evidence: >-
+    HMAC-SHA256 over the raw body, delivered in an X-Webhook-Signature header as a bare 64-char
+    lowercase hex digest, with constant-time comparison guidance and reference implementations.
+    Source https://docs.superdial.com/guides/webhooks#signature-verification.
+  deviation: >-
+    Not RFC 9421 HTTP Message Signatures, and the signature includes no timestamp, so it provides
+    no replay protection on its own — SuperDial documents this limitation explicitly.
+- id: a2a
+  name: A2A Agent Card
+  conforms: true
+  version: '0.3'
+  evidence: >-
+    https://docs.superdial.com/.well-known/agent-card.json returns HTTP 200 with a card that passes
+    every A2A 1.0.0 hard check. Graded conformant — see a2a/superdial-a2a.yml.
+- id: mcp
+  name: Model Context Protocol
+  conforms: true
+  evidence: >-
+    https://docs.superdial.com/mcp answers an anonymous tools/list over streamable-HTTP with 3
+    tools carrying inputSchema and annotations. See mcp/superdial-mcp.yml. Scope is documentation
+    search, not the API operations.
+domain_standards:
+  regime: healthcare / us-revenue-cycle
+  assessment: >-
+    SuperDial's market — US healthcare revenue cycle — has well-established domain standards, and
+    the SuperDial CONTRACT declares none of them. This is a substantive finding, not an absence of
+    opportunity.
+  checked:
+  - id: x12-edi
+    present_in_contract: false
+    note: >-
+      X12 270/271 (eligibility), 276/277 (claim status) and 278 (prior authorization) are the
+      standard EDI transactions for exactly the workflows SuperDial automates. The marketing site
+      states SuperDial uses "EDI and API Connectivity" as a channel, but no X12 transaction set,
+      segment, loop or identifier appears anywhere in the OpenAPI or the documentation. The API's
+      own vocabulary is proprietary: schemaId, requestType (claim-status, vob), inputs, results.
+  - id: fhir
+    present_in_contract: false
+    note: >-
+      No FHIR resources, no CoverageEligibilityRequest/Response, no ClaimResponse, no FHIR base
+      URL, no CapabilityStatement. Results are returned as an untyped schema-specific
+      key/value `results` object rather than as any typed clinical or financial resource.
+  - id: hl7v2
+    present_in_contract: false
+  - id: da-vinci
+    present_in_contract: false
+    note: No Da Vinci CRD/DTR/PAS implementation guide conformance declared, despite prior authorization being a marquee workflow.
+  - id: npi
+    present_in_contract: true
+    note: >-
+      The only healthcare identifier standard the contract genuinely speaks. NPI appears as a
+      first-class input and across the error registry (BILLING_PROVIDER_NPI_INCORRECT,
+      RENDERING_PROVIDER_NPI_INCORRECT, FACILITY_NPI_INCORRECT, OFFICE_NPI_INCORRECT,
+      PRACTICE_NPI_INCORRECT), alongside PTAN and Tax ID. These are CMS-defined identifiers used
+      correctly, but they are identifier vocabulary rather than a message or API standard.
+  verdict: >-
+    Partial. SuperDial uses standard US healthcare IDENTIFIERS (NPI, PTAN, Tax ID) but declares no
+    standard MESSAGE or API format (no X12, no FHIR). A buyer already speaking X12 or FHIR needs a
+    bespoke connector to SuperDial's proprietary request/schema model. That is a defensible product
+    choice — the whole premise is reaching payers that do NOT expose an electronic transaction —
+    but it should be recorded rather than assumed away.
+compliance:
+  trust_center:
+    present: true
+    url: https://app.vanta.com/thesuperbill.com/trust/yxpg5guedf5rle15cka4ab
+    platform: Vanta
+    http_status: 200
+    linked_from: https://www.superdial.com/ (footer, "Security")
+    machine_readable: false
+    note: >-
+      The trust center is a JavaScript-rendered single-page app; the fetched body is a 5KB shell
+      carrying no certification names. Certifications below are therefore recorded from SuperDial's
+      own public statements, not read off the trust center.
+  certifications:
+  - {name: HIPAA, claimed: true, source: 'SuperDial public statements and press coverage of the 2025 Series A', verified_on_trust_center: false}
+  - {name: SOC 2 Type II, claimed: true, source: 'SuperDial public statements; audit reported completed November 2025', verified_on_trust_center: false}
+  - {name: HITRUST e1, claimed: true, source: SuperDial public statements, verified_on_trust_center: false}
+  practices_claimed:
+  - BAAs executed before PHI exchange
+  - AES-256 encryption at rest
+  - TLS in transit
+  - SSO and MFA support
+  - Customer-specific data controls and vendor security reviews
+  caveat: >-
+    These are provider claims. API Evangelist could not read certification names off the Vanta
+    trust center because it renders client-side, and no certification is asserted in any
+    machine-readable form on any SuperDial host.

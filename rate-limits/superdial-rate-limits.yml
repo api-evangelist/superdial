@@ -1,0 +1,63 @@
+generated: '2026-08-29'
+method: searched
+source: https://docs.superdial.com/guides/creating-a-request
+docs:
+- https://docs.superdial.com/guides/creating-a-request
+- https://docs.superdial.com/guides/sandbox#limits
+limit_count: 0
+published_request_limits: false
+response_headers_published: false
+headers: []
+status_on_exhaustion: null
+findings:
+- >-
+  SuperDial publishes NO conventional API rate limits: no requests-per-second, no
+  requests-per-minute, no burst allowance, no X-RateLimit-* or RateLimit-* response headers, and no
+  429 anywhere in the OpenAPI. Every documented status code across all seven operations is
+  200/207/400/401/403/404/500.
+- >-
+  The real constraint is not a request rate — it is a DAILY CALL CAPACITY on the account, enforced
+  at scheduling time rather than at request time.
+capacity_model:
+  name: account daily call capacity
+  unit: phone calls per business day
+  value_published: false
+  enforcement: scheduling-time
+  behavior: >-
+    On POST /v1/requests, entries are grouped and assigned a dueDate against the account's daily
+    call capacity and any work already pending on those days. A batch that fits in one day shares a
+    requestBatchId; a batch that overflows is split across business days and receives multiple
+    requestBatchId values. The dueDate on the response tells the caller when each request is
+    scheduled to run.
+  exhaustion:
+    status: 400
+    error_code: INVALID_REQUEST
+    message_example: 'Could not schedule all rows within 365 days: N of M rows could not be placed'
+    horizon: 365 days
+    note: >-
+      Capacity exhaustion surfaces as an ordinary 400 validation error, NOT as a 429 with
+      Retry-After. A client's standard rate-limit backoff path will not catch it; it must be
+      handled as a scheduling failure.
+  sandbox: >-
+    Sandbox requests count against the same daily call capacity. A sandbox account provisioned with
+    a non-zero limit can hit the identical 400 during load testing.
+  raising_it: Coordinate with the SuperDial account team. Not self-serve.
+webhook_side_limits:
+  consumer_timeout: 10 seconds
+  retry_attempts: 4 total (1 initial + 3 retries)
+  backoff: 0.5s, 1s, 2s
+  note: These bound SuperDial's outbound delivery to the customer, not the customer's inbound request rate.
+token_limits:
+  bearer_token_lifetime: 1 hour
+  note: >-
+    Tokens are short-lived, so a long-running agent must re-authenticate via GET /v1/auth roughly
+    hourly. No documented limit on how often /v1/auth may be called.
+agent_guidance: >-
+  Do not model SuperDial as a rate-limited API. Model it as a capacity-scheduled queue: submissions
+  are accepted or rejected wholesale at scheduling time, results arrive asynchronously on a dueDate,
+  and the only backpressure signal is a 400 on the batch.
+notes:
+- >-
+  limit_count is 0 because no numeric per-interval limit is published anywhere. The capacity model
+  above is documented in words but carries no published value — the actual daily capacity is
+  account-specific and contractual.

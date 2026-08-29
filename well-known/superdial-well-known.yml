@@ -1,0 +1,42 @@
+generated: '2026-08-29'
+method: probed
+source: live GET probes of /.well-known/* on every apis.yml and OpenAPI servers[] host
+hosts:
+- host: www.superdial.com
+  documents:
+  - {path: /.well-known/security.txt, status: 404, file: null}
+  - {path: /.well-known/openid-configuration, status: 404, file: null}
+  - {path: /.well-known/oauth-authorization-server, status: 404, file: null}
+  - {path: /.well-known/api-catalog, status: 404, file: null}
+  - {path: /.well-known/ai-plugin.json, status: 404, file: null}
+  - {path: /.well-known/agent-card.json, status: 404, file: null}
+  - {path: /.well-known/agent.json, status: 404, file: null}
+- host: docs.superdial.com
+  documents:
+  - {path: /.well-known/agent-card.json, status: 200, file: a2a/superdial-agent-card.json}
+  - {path: /.well-known/agent-skills/super-dial/skill.md, status: 200, file: skills/superdial-super-dial.md}
+  - {path: /.well-known/security.txt, status: 404, file: null}
+  - {path: /.well-known/openid-configuration, status: 404, file: null}
+  - {path: /.well-known/oauth-authorization-server, status: 404, file: null}
+  - {path: /.well-known/api-catalog, status: 404, file: null}
+  - {path: /.well-known/ai-plugin.json, status: 404, file: null}
+  - {path: /.well-known/agent.json, status: 404, file: null}
+- host: robodialer-service-api-9nc4t1p9.uc.gateway.dev
+  documents:
+  - {path: /.well-known/security.txt, status: 404, file: null}
+  - {path: /.well-known/openid-configuration, status: 404, file: null}
+  - {path: /.well-known/oauth-authorization-server, status: 404, file: null}
+  - {path: /.well-known/api-catalog, status: 404, file: null}
+  - {path: /.well-known/ai-plugin.json, status: 404, file: null}
+  - {path: /.well-known/agent-card.json, status: 404, file: null}
+  - {path: /.well-known/agent.json, status: 404, file: null}
+notes:
+- >-
+  Two real well-known documents are served, both on the documentation host: an A2A agent card and
+  an Agent Skill. Both are saved verbatim in this repo.
+- >-
+  No security.txt on any host, so no SecurityTxt pointer is emitted. The www host returns a custom
+  404 body ("Invalid .well-known request") for every well-known path — a real 404, not an SPA
+  catch-all. The API gateway host returns the Google Cloud API Gateway JSON 404.
+- >-
+  No /.well-known/api-catalog anywhere, so the API is not discoverable via RFC 9727.

@@ -1,0 +1,91 @@
+generated: '2026-08-29'
+method: derived
+source: openapi/superdial-api-openapi.yml + https://docs.superdial.com/guides/concepts
+description: >-
+  Entity graph derived from the SuperDial OpenAPI component schemas and $ref links, enriched from
+  the published concepts glossary.
+entities:
+- name: Request
+  schema: RequestResponse
+  description: >-
+    A single structured data extraction job against one payer. The central entity — everything else
+    hangs off it.
+  identifier: {field: requestId, format: 20-character opaque string}
+  key_fields: [requestId, requestBatchId, schemaId, requestType, state, inputs, results, missingFields, dateCreated, completedAt, dueDate, internalId, internalTag, modality, data_completeness, error, payerLookup, to]
+  states: [PROCESSING, SUCCESS, PARTIAL, FAILURE]
+  enrichment_fields: [transcript, transcriptPostCall, recordingDownloadUrl, callDuration, callFromNumber, callSummary, callAuditSummary, contributingCalls, callSteps, resultSources]
+- name: RequestBatch
+  description: >-
+    A scheduling grouping, NOT a submission grouping. Requests scheduled for the same business day
+    share a requestBatchId; one POST can produce several.
+  identifier: {field: requestBatchId, format: 20-character opaque string}
+- name: Schema
+  schema: SchemaSummary
+  description: >-
+    Defines both the inputs a request requires and the fields returned in results. Provisioned per
+    account; can be retired.
+  identifier: {field: schemaId}
+  key_fields: [schemaId, requestType]
+- name: RequestType
+  description: >-
+    Server-derived category of extraction, carried on the schema (e.g. claim-status, vob). Sending
+    requestType on a POST is silently ignored.
+  identifier: {field: requestType, format: slug}
+- name: Payer
+  schema: MatchedPayerEntry
+  description: The insurance company a request asks about, identified by inputs.payerName.
+  identifier: {field: payerName, format: free-text name resolved by lookup}
+- name: PayerLookup
+  schema: PayerLookup
+  description: Resolution record reporting the payer match and the number that will be dialed.
+  key_fields: [inputPayerName, inputPhoneNumber, matchedPayerName, matchedPayerPhone, phoneNumberToUse, phoneNumberSource]
+- name: CallStep
+  description: >-
+    One effort within a request. A follow-up step (e.g. prior auth after benefits) appears as a
+    second entry linked back by triggeredBy.
+  key_fields: [schemaId, triggeredBy, numContributingCalls]
+- name: ContributingCall
+  description: An individual phone call behind a step, with its own transcript and captured fields.
+  identifier: {field: id, format: opaque}
+- name: ResultSources
+  description: Map from each result field to the call that produced it, and through that call's step to the schema behind it.
+- name: Error
+  description: Structured business-outcome failure on a FAILURE request.
+  key_fields: [errorCategory, errorCode, errorMessage]
+- name: Webhook
+  description: Outbound notification sent when a request reaches a terminal state.
+  key_fields: [requestId, requestBatchId, state, internalId, internalTag]
+relationships:
+- {from: Request, to: RequestBatch, type: belongs_to, via: requestBatchId}
+- {from: RequestBatch, to: Request, type: has_many, via: requestBatchId}
+- {from: Request, to: Schema, type: belongs_to, via: schemaId}
+- {from: Schema, to: Request, type: has_many, via: schemaId}
+- {from: Schema, to: RequestType, type: has_one, via: requestType}
+- {from: Request, to: RequestType, type: has_one, via: requestType, note: server-derived from the schema}
+- {from: Request, to: Payer, type: belongs_to, via: inputs.payerName}
+- {from: Request, to: PayerLookup, type: has_one, via: payerLookup, note: present only when payer phone number lookup is enabled for the account}
+- {from: PayerLookup, to: Payer, type: has_one, via: matchedPayerName}
+- {from: Request, to: CallStep, type: has_many, via: callSteps, note: single-request read only}
+- {from: CallStep, to: CallStep, type: has_one, via: triggeredBy, note: self-referencing — a follow-up step names the step it was opened off}
+- {from: CallStep, to: Schema, type: has_one, via: schemaId, note: each step names the schema it ran}
+- {from: CallStep, to: ContributingCall, type: has_many, via: callStep tag}
+- {from: Request, to: ContributingCall, type: has_many, via: contributingCalls, note: SUCCESS or PARTIAL only}
+- {from: Request, to: ResultSources, type: has_one, via: resultSources}
+- {from: ResultSources, to: ContributingCall, type: has_many, via: field-to-call map}
+- {from: Request, to: Error, type: has_one, via: error, note: non-null only on FAILURE}
+- {from: Request, to: Webhook, type: has_many, via: requestId, note: at-least-once delivery, one per terminal transition}
+id_formats:
+- {entity: Request, field: requestId, format: 20-character opaque, prefixed: false, note: same format in sandbox and production}
+- {entity: RequestBatch, field: requestBatchId, format: 20-character opaque, prefixed: false}
+- {entity: Schema, field: schemaId, format: 20-character opaque, prefixed: false}
+notes:
+- >-
+  The `results` object is deliberately untyped in the contract — its keys are defined by the
+  account's schema at runtime, not by the OpenAPI. This means the response shape of the primary
+  business payload cannot be known from the specification alone; it must be discovered at runtime
+  via GET /v1/schemas/{schemaId}/required-inputs. That is the single biggest limitation of this
+  data model for an agent or a code generator.
+- >-
+  The call-provenance chain (Request -> CallStep -> ContributingCall -> ResultSources) is unusually
+  rich: it lets a consumer trace any individual result field back to the specific phone call and
+  schema that produced it. That is a genuine auditability feature for a regulated healthcare buyer.

@@ -1,0 +1,38 @@
+generated: '2026-08-29'
+method: searched
+source: https://www.superdial.com/ (site navigation, footer and sitemap)
+plan_count: 0
+public_pricing: false
+model: enterprise-contact-sales
+evidence:
+- {url: 'https://www.superdial.com/pricing', status: 404}
+- {url: 'https://www.superdial.com/sitemap.xml', status: 200, note: '285 URLs, none a pricing page'}
+- {url: 'https://www.superdial.com/demo', status: 200, note: 'The commercial entry point is "Book a Demo"'}
+- {url: 'https://docs.superdial.com/llms.txt', status: 200, note: '17 documentation pages indexed, none covering pricing or plans'}
+findings:
+- >-
+  SuperDial publishes no plans, no tiers, no list price and no unit rate. There is no pricing page
+  on the marketing site and no billing or usage endpoint in the API.
+- >-
+  The only commercial entry point is a demo booking form at https://www.superdial.com/demo. Sign-in
+  is at https://app.thesuperbill.com/super-dial-sign-in and is for existing accounts.
+- >-
+  Capacity is contracted rather than purchased self-serve: the docs repeatedly refer to "your
+  account's daily call capacity" and direct callers to "ask your account team" to raise it,
+  to provision sandbox credentials, to set an account-level webhook URL, and to enable optional
+  capabilities (payer phone number lookup, per-payer required inputs, transcriptPostCall,
+  callFromNumber). Every one of those is a human commercial step.
+billing_signals_in_api:
+  field: modality
+  description: >-
+    The RequestResponse carries a `modality` field recorded explicitly "for billing audit and
+    routing". phone_only and digital_plus_phone both mean a phone call was placed and is billable
+    at the phone-call rate; digital_only means no phone call was placed. This is the only pricing
+    dimension SuperDial exposes anywhere — it confirms billing is per-call and that digital
+    fulfilment is priced differently from phone fulfilment, without disclosing either rate.
+  source: https://docs.superdial.com/guides/concepts#modality
+plans: []
+notes:
+- >-
+  plan_count is 0 as a measured fact, not as a gap in this pass. An agent or buyer cannot
+  determine cost from any public SuperDial surface.

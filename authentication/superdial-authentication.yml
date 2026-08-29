@@ -1,0 +1,68 @@
+generated: '2026-08-29'
+method: searched
+source: https://docs.superdial.com/api-reference/authentication/authenticate-and-get-token
+summary:
+  types:
+  - apiKey
+  - http
+  api_key_in:
+  - header
+schemes:
+- name: apiKey
+  type: apiKey
+  in: header
+  parameter: Robodialer-API-Key
+  description: Your SuperDial API key
+  sources:
+  - openapi/superdial-api-openapi.yml
+  role: Identifies the account. Sent to GET /v1/auth only.
+- name: apiSecret
+  type: apiKey
+  in: header
+  parameter: Robodialer-API-Secret
+  description: Your SuperDial API secret
+  sources:
+  - openapi/superdial-api-openapi.yml
+  role: Authenticates the request. Sent to GET /v1/auth only.
+- name: bearerAuth
+  type: http
+  scheme: bearer
+  description: Bearer token obtained from the /v1/auth endpoint
+  sources:
+  - openapi/superdial-api-openapi.yml
+  role: Authorizes every other operation. Obtained from GET /v1/auth, lives 1 hour.
+docs: https://docs.superdial.com/guides/creating-a-request#authentication
+model:
+  style: key-secret-exchange-for-bearer-token
+  description: 'Two distinct values are issued together: the API KEY identifies the account, the API SECRET
+    authenticates the request. Both are sent as headers to GET /v1/auth, which returns a short-lived bearer
+    token. Every other operation takes Authorization: Bearer <token>.'
+  token_lifetime: 1 hour
+  token_endpoint: GET /v1/auth
+  oauth2: false
+  scopes: null
+  mtls: false
+  note: No OAuth 2.0 and no scope surface, so no scopes/ artifact is emitted — the model is account-wide
+    bearer access rather than delegated, scoped authorization.
+credential_environments:
+- name: production
+  provisioning: account team
+  note: Also the default webhook signing secret when no separate webhook secret is set.
+- name: sandbox
+  provisioning: account team, on request
+  note: A distinct key/secret pair. Authenticating with it routes every request through the sandbox path
+    automatically — there is no per-request flag.
+webhook_verification:
+  header: X-Webhook-Signature
+  algorithm: HMAC-SHA256
+  encoding: bare 64-character lowercase hex digest
+  secret: The account webhook secret if configured, otherwise the PRODUCTION API key — including for sandbox
+    webhooks.
+  gotcha: Verifying a sandbox webhook with the sandbox API key will fail. The production-side secret signs
+    both.
+notes:
+- The spec declares three securitySchemes but no top-level `security` requirement and no per-operation
+  security block, so the OpenAPI alone does not state which scheme applies where. That mapping comes from
+  the docs and is recorded above.
+- 'No self-serve signup: credentials are provisioned by the SuperDial account team. An agent cannot obtain
+  access programmatically.'

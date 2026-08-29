@@ -1,0 +1,91 @@
+generated: '2026-08-29'
+method: searched
+source: https://docs.superdial.com/guides/sandbox
+docs:
+- https://docs.superdial.com/guides/sandbox
+- https://docs.superdial.com/guides/concepts#production-vs-sandbox
+available: true
+name: SuperDial Sandbox
+model: credential-scoped
+activation:
+  mechanism: separate sandbox API key/secret pair
+  per_request_flag: false
+  description: >-
+    Accounts can be provisioned with a sandbox API key/secret pair distinct from any production
+    credentials. Use the sandbox pair when fetching a token via GET /v1/auth; every request
+    authenticated with the resulting sandbox token is treated as a sandbox request automatically.
+    There is no per-request flag.
+  provisioning: Ask the account team to provision sandbox credentials.
+  self_serve: false
+identical_to_production:
+- Validation of schemaId and inputs
+- Schema lookup against the schemas provisioned for the account
+- Required-input checks, producing the same INVALID_INPUTS 400 envelope
+- internalId idempotency dedup
+- Batch grouping and due-date scheduling against the account's daily call capacity
+- A real requestId and requestBatchId readable via GET /v1/requests/{requestId} and the list endpoint
+- Webhook delivery to the configured URL
+- All response shapes and HTTP status codes
+differences:
+- field: phone call
+  behavior: >-
+    No phone call is dialed. A call record is still written for traceability but never reaches a
+    real outbound phone line.
+- field: results
+  behavior: >-
+    LLM-generated. SuperDial uses an LLM to produce realistic mock values for every field defined
+    by the schemaId, then feeds those through the same callback path a real call would use.
+- field: transcript
+  behavior: A fixed placeholder line, not a transcript of any real conversation.
+- field: callSummary
+  behavior: A fixed placeholder sentence.
+- field: callAuditSummary
+  behavior: A fixed placeholder sentence.
+- field: recordingDownloadUrl
+  behavior: A signed URL pointing at a placeholder MP3.
+webhooks:
+  fire: true
+  same_url_as_production: true
+  same_payload_shape: true
+  signing_secret_gotcha: >-
+    Sandbox webhooks are signed with the PRODUCTION-side signing secret (the webhook secret if set,
+    otherwise the production API key), even though the request was created with sandbox
+    credentials. Using the sandbox API key to verify will fail. This is the single most likely
+    integration mistake in the sandbox.
+test_values:
+  published_test_credentials: false
+  test_cards: null
+  magic_identifiers: null
+  note: >-
+    SuperDial publishes NO fixed test values — no magic member IDs, no test payer names, no
+    sentinel phone numbers. Sandbox realism comes from LLM-generated results against the account's
+    own schema rather than from a published fixture set. Nothing is invented here; the docs list
+    none.
+id_format: >-
+  Sandbox requestId and requestBatchId values use the same 20-character format as production.
+data_isolation: >-
+  Whether sandbox and production data live in the same scope or are isolated depends on how the
+  account is provisioned. The docs direct callers to confirm with their account team, so isolation
+  is NOT guaranteed by default.
+limits:
+  counts_against_daily_capacity: true
+  description: >-
+    Sandbox requests count against the account's daily call capacity for scheduling purposes. If a
+    sandbox account is provisioned with a non-zero limit, batch due-date scheduling can return the
+    same 400 INVALID_REQUEST seen in production when capacity runs out, e.g. "Could not schedule
+    all rows within 365 days: N of M rows could not be placed".
+published_test_plan:
+- {step: 1, name: Happy path, assertion: 'POST a valid single request, expect 200 with requestId, await webhook, GET the request, expect state SUCCESS with LLM-generated mock values in results'}
+- {step: 2, name: Validation failures, assertion: 'POST with missing schemaId, non-object inputs, missing schema-required inputs, and bad formats; confirm the client surfaces INVALID_REQUEST and INVALID_INPUTS correctly'}
+- {step: 3, name: Idempotency, assertion: 'POST the same internalId twice; confirm the second response returns the same requestId rather than creating a duplicate'}
+- {step: 4, name: Batch, assertion: 'POST {"requests": [valid, invalid]}; confirm HTTP 207 with a per-entry success body and a per-entry error envelope, handled independently'}
+- {step: 5, name: Webhook signature, assertion: 'verify the HMAC-SHA256 signature on the incoming webhook body using the PRODUCTION API key'}
+notes:
+- >-
+  This is a genuinely strong sandbox for a voice-AI provider: the whole create path — validation,
+  idempotency, scheduling, capacity, webhook delivery and signature — runs identically, and only
+  the phone call itself is stubbed. It is also the only rehearsal mechanism available, since the
+  API has no reversal operation (see conventions/superdial-conventions.yml reversibility).
+- >-
+  Sandbox credentials are not self-serve; they must be requested from the account team, so an
+  agent cannot obtain a test environment without a human commercial step.

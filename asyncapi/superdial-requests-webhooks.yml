@@ -1,0 +1,106 @@
+generated: '2026-08-29'
+method: searched
+source: https://docs.superdial.com/guides/webhooks
+docs:
+- https://docs.superdial.com/guides/webhooks
+- https://docs.superdial.com/guides/sandbox#sandbox-webhooks
+asyncapi_published: false
+asyncapi_probed:
+- {url: 'https://docs.superdial.com/asyncapi.yaml', status: 404}
+- {url: 'https://docs.superdial.com/asyncapi.json', status: 404}
+note: >-
+  SuperDial publishes no AsyncAPI document, but it does publish a real, well-specified webhook
+  surface. This artifact captures that webhook catalog. It is emitted as type Webhooks, not
+  AsyncAPI — nothing is fabricated into a spec the provider does not publish.
+event_surface:
+  style: outbound-webhook
+  direction: SuperDial -> customer endpoint
+  transport: HTTPS POST
+  content_type: application/json
+  delivery_guarantee: at-least-once
+  ordering: none stated
+configuration:
+  account_default:
+    description: An account-level webhook URL set by the SuperDial account team; becomes the default for every request.
+    self_serve: false
+  per_request_override:
+    field: webhookUrl
+    location: POST /v1/requests body (top level)
+    precedence: The per-request value always wins over the account default.
+  none_configured: >-
+    If neither is configured, no webhook is sent and the caller must poll
+    GET /v1/requests/{requestId} for results.
+events:
+- name: request.terminal
+  description: >-
+    Fired once per request when it reaches a terminal state. There is only one webhook event type;
+    the `state` field discriminates the outcome. No webhook is sent while a request is PROCESSING.
+  trigger_states: [SUCCESS, PARTIAL, FAILURE]
+  payload_fields:
+  - {name: requestId, type: string, always_present: true, description: 'The request ID. Use it to fetch the full result via GET /v1/requests/{requestId}.'}
+  - {name: requestBatchId, type: string, always_present: true, description: The batch this request belongs to.}
+  - {name: state, type: string, always_present: true, enum: [SUCCESS, PARTIAL, FAILURE], description: Uppercase.}
+  - {name: internalId, type: string, always_present: false, description: 'Echoed from input. When not supplied at create time the KEY IS ABSENT from the JSON object entirely — not null, not empty string.'}
+  - {name: internalTag, type: string, always_present: false, description: 'Echoed from input. Same absent-key semantics as internalId.'}
+  example: |
+    {
+      "requestId": "8bF7xK2mP9qR4sT6uV0w",
+      "requestBatchId": "pH9kJ2lM4nB6vC8xZ7Qr",
+      "state": "SUCCESS",
+      "internalId": "claim_internal_456",
+      "internalTag": "march-batch"
+    }
+  design_note: >-
+    The payload is intentionally compact and carries NO timestamps and NO results. It is a
+    notification, not a data delivery: the consumer must call GET /v1/requests/{requestId} to get
+    results, missingFields, modality, data_completeness, the error object, and the call enrichment
+    fields. By the time the webhook fires the request is fully readable.
+state_semantics:
+- {state: SUCCESS, meaning: Completed with every required field populated. results full, error null.}
+- {state: PARTIAL, meaning: 'The primary call effort succeeded but a follow-up effort failed. results holds what the successful effort captured, missingFields lists what the failed follow-up did not, and error is null.'}
+- {state: FAILURE, meaning: No required fields were captured. results empty and error describes the cause.}
+security:
+  signature:
+    header: X-Webhook-Signature
+    algorithm: HMAC-SHA256
+    encoding: bare 64-character lowercase hex digest, no "sha256=" prefix or other framing
+    signed_over: the raw request body bytes exactly as received
+    signing_secret: >-
+      The account's webhook secret if one has been set up on the portal, otherwise the PRODUCTION
+      API key. The same production-side secret signs sandbox webhooks; a sandbox API key will fail
+      verification.
+    verification_guidance: >-
+      Compute the HMAC over the raw body bytes — do not parse and re-serialize the JSON, which
+      changes the byte sequence and breaks the signature. Use a constant-time comparator
+      (hmac.compare_digest / crypto.timingSafeEqual), not ==.
+    reference_implementations: [python, nodejs]
+  replay_protection:
+    timestamp_in_signature: false
+    note: >-
+      The signature does not include a timestamp, so it cannot detect replays on its own. SuperDial
+      documents this limitation explicitly and directs consumers to dedup on requestId instead.
+delivery:
+  attempts: 4
+  retries: 3
+  backoff: exponential — 0.5s, 1s, 2s
+  retry_on: [5xx response, connection failure]
+  no_retry_on:
+    codes: [4xx]
+    rationale: Treated as terminal — re-posting the same payload is unlikely to succeed.
+  on_exhaustion: >-
+    The failure is recorded and no further attempts are made. Fall back to polling
+    GET /v1/requests/{requestId} to recover.
+  consumer_timeout: 10 seconds
+  consumer_guidance:
+  - Return HTTP 200 as quickly as possible; push processing to a background job.
+  - Ack with 2xx as soon as the event is durably enqueued.
+  - Track submitted requestIds; any request whose terminal outcome has not arrived within the expected window should trigger a fallback poll.
+idempotency:
+  duplicate_delivery: >-
+    In rare cases the same requestId may arrive more than once. Always treat requestId as a dedup
+    key. If internalId was also supplied at create time, there are two layers of dedup keys.
+assessment: >-
+  A complete and honest webhook contract: signed, retried with stated backoff, with the replay
+  limitation disclosed rather than glossed over, and a documented polling fallback. The main gaps
+  against an AsyncAPI-grade surface are the absence of a machine-readable event schema and the
+  absence of any inbound/streaming surface.

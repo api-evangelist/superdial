@@ -1,0 +1,97 @@
+generated: '2026-08-29'
+method: searched
+source: https://docs.superdial.com/guides/creating-a-request#error-handling
+docs:
+- https://docs.superdial.com/guides/creating-a-request
+- https://docs.superdial.com/guides/reading-requests
+- https://docs.superdial.com/guides/input-validation
+derived_from: openapi/superdial-api-openapi.yml
+format: custom
+rfc9457: false
+envelope:
+  media_type: application/json
+  shape: '{ "error": "<STABLE_CODE>", "message": "<human readable>", "details": { ... } }'
+  fields:
+  - {name: error, type: string, description: Stable machine-readable code. Dispatch on this.}
+  - {name: message, type: string, description: Human-readable description, safe to surface to end users. Wording may change between releases.}
+  - {name: details, type: object, required: false, description: Structured detail; carries missingInputs / invalidInputs on the INVALID_INPUTS path.}
+  notes:
+  - >-
+    Uniform across /v1/requests and /v1/schemas. In a batch submission each failed entry inside the
+    `requests` array carries the same envelope shape, so one error handler works everywhere.
+  - >-
+    401 is the exception: it is produced by the Google Cloud API Gateway in front of the service and
+    returns the gateway's `{code, message}` shape, NOT the envelope above. A client must handle two
+    error shapes.
+problem_types:
+- code: INVALID_REQUEST
+  status: 400
+  title: Malformed request body or scheduling capacity exceeded
+  detail: >-
+    Body was not a JSON object, a required field is missing (schemaId, inputs), the batch requests
+    array is empty, or scheduling capacity was exceeded. The specific reason is in message.
+  remediation: Fix the body and retry.
+- code: INVALID_INPUTS
+  status: 400
+  title: Input validation failed
+  detail: >-
+    details.missingInputs lists field names that were not supplied; details.invalidInputs maps a
+    field name to the reason it was rejected. With per-payer required inputs enabled, some payers
+    add inputs that can appear here too.
+  remediation: Fix the inputs and retry. Resolve payer-specific inputs up front with POST /v1/schemas/{schemaId}/required-payer-inputs.
+- code: PAYER_NOT_FOUND
+  status: 400
+  title: Payer name did not match any known payer
+  detail: >-
+    Fires only when payer phone number lookup is enabled for the account, payerName is set, and
+    phoneNumber is not.
+  remediation: Confirm spelling, try a more canonical payer name, or supply phoneNumber directly to skip the lookup.
+- code: null
+  status: 401
+  title: Missing, malformed or expired bearer token
+  detail: Returned by the API gateway in the {code, message} shape, not the standard envelope.
+  remediation: Fetch a fresh token via GET /v1/auth.
+- code: SCHEMA_NOT_FOUND
+  status: 404
+  title: schemaId does not exist for this account or has been retired
+  detail: >-
+    On a batch, schema-not-found surfaces per-entry as INVALID_REQUEST with "Schema not found" in
+    message. Read message to distinguish 4xx causes when an entry has no status code.
+  remediation: Discover valid schemaId values with GET /v1/schemas.
+- code: ACCOUNT_NOT_FOUND
+  status: 404
+  title: API key resolves to an account that no longer exists
+  detail: Rare; a wrong API key hits INVALID_API_KEY at /v1/auth first.
+  remediation: Contact support.
+- code: REQUEST_NOT_FOUND
+  status: 404
+  title: Request ID not found
+  detail: >-
+    Also produced transiently by read-after-write lag — for a few seconds after a successful POST
+    /v1/requests, a GET for the just-created ID can 404 even though the POST succeeded.
+  remediation: Tolerate 404s for the first few seconds after create when polling, or use the webhook flow which sidesteps this entirely.
+- code: INTERNAL_ERROR
+  status: 500
+  title: Unexpected server failure
+  detail: >-
+    Single-item POST returns the standard envelope. Batch can take either shape: the top-level
+    INTERNAL_ERROR envelope (most common) or {"requests": [...]} with per-entry envelopes, where
+    server-error entries surface as INVALID_REQUEST rather than INTERNAL_ERROR. Check for the
+    `requests` key to tell the two shapes apart.
+  remediation: Retry once; escalate if persistent.
+- code: PAYER_LOOKUP_FAILURE
+  status: 500
+  title: Payer matched but no phone number on file, or transient lookup failure
+  detail: Fires only when payer phone number lookup is enabled for the account.
+  remediation: Retry with backoff, or supply phoneNumber directly to skip the lookup.
+partial_success:
+  status: 207
+  description: >-
+    A batch POST /v1/requests returns HTTP 207 with a per-entry body: successes carry the created
+    requestId, failures carry the same {error, message} envelope. Entries must be handled
+    independently.
+notes:
+- >-
+  These are TRANSPORT errors. SuperDial also publishes a separate, richer taxonomy of BUSINESS
+  outcome errors on the request object itself (errorCategory / errorCode) — captured in
+  errors/superdial-error-codes.yml. A request can return HTTP 200 and still have failed.
