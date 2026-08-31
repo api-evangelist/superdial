@@ -41,6 +41,11 @@ apis:
   - Requests
   - Schemas
   - Authentication
+  - Webhook
+  tags_raw:
+  - Requests
+  - Schemas
+  - Authentication
   - Webhooks
   properties:
   - type: OpenAPI

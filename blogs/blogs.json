@@ -1,0 +1,14 @@
+{
+  "repo": "superdial",
+  "feeds": [
+    {
+      "source": "https://docs.superdial.com/guides/creating-a-request",
+      "feed_url": "https://docs.superdial.com/guides/creating-a-request",
+      "title": "",
+      "saved": 0,
+      "method": "none"
+    }
+  ],
+  "post_count": 0,
+  "fetched": "2026-08-30T22:33:40Z"
+}
