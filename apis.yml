@@ -11,6 +11,22 @@ description: 'SuperDial builds voice AI agents that automate high-friction admin
   Stanford classmates Sam Schwager and Harrison Caruthers, the company raised a $15M Series A led by SignalFire
   in 2025.'
 url: https://raw.githubusercontent.com/api-evangelist/superdial/refs/heads/main/apis.yml
+accessModel:
+  pricing: unknown
+  onboarding: approval
+  trial: false
+  try_now: false
+  public: false
+  label: Requires approval
+  confidence: medium
+  source:
+  - plans
+  - authentication
+  - rate-limits
+  - security
+  - sandbox
+  generated: '2026-09-03'
+  method: derived
 image: https://cdn.prod.website-files.com/6a295c5ee7351e54c6d2a237/6a66f67df4c11ba71463b5e3_OG%20Superdial%20v2.png
 x-type: company
 x-source: harvest:secondary-market
