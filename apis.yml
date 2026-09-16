@@ -45,48 +45,74 @@ tags:
 - Benefits Verification
 - Automation
 apis:
-- name: SuperDial API
-  description: Asynchronous REST API for submitting structured data extraction requests against insurance
-    payers and retrieving the results. Submit a request (single or batch) against an account-provisioned
-    schema, discover the inputs a schema requires, resolve payer names to dialing numbers, and read results
-    by ID or by batch. Terminal results are delivered by an HMAC-SHA256-signed webhook. Auth is a short-lived
-    bearer token exchanged for an API key/secret pair.
+- aid: superdial:superdial-authentication-api
+  name: SuperDial Authentication API
+  description: >-
+    SuperDial employs Bearer Authentication. Fetch a bearer token using your API Key and API Secret, then
+    pass it as `Authorization: Bearer <token>` on subsequent calls.
   humanURL: https://docs.superdial.com/introduction
   baseURL: https://robodialer-service-api-9nc4t1p9.uc.gateway.dev
   tags:
-  - Requests
-  - Schemas
   - Authentication
-  - Webhook
-  tags_raw:
-  - Requests
-  - Schemas
-  - Authentication
-  - Webhooks
   properties:
   - type: OpenAPI
-    url: openapi/superdial-api-openapi.yml
+    url: openapi/superdial-authentication-api-openapi.yml
   - type: Documentation
     url: https://docs.superdial.com/introduction
   - type: APIReference
     url: https://docs.superdial.com/api-reference/requests/create-a-request
-  - type: Overlay
-    url: overlays/superdial-api-overlay.yaml
   - type: Webhooks
     url: asyncapi/superdial-requests-webhooks.yml
   - type: DataModel
     url: data-model/superdial-data-model.yml
-  x-base-url-note: 'baseURL is a Google Cloud API Gateway managed host (*.uc.gateway.dev) running SuperDial''s
-    "robodialer-service-api". It is the real production base: the OpenAPI servers[] entry is labelled
-    "Production", all three sources (apis.yml, _original and refined spec) agree, and the documentation''s
-    own curl and Python examples call it directly. repair-api-bases.py flags it nonprod-host on the hostname
-    heuristic; that is a false positive for a GCP API Gateway deployment.'
+- aid: superdial:superdial-requests-api
+  name: SuperDial Requests API
+  description: >-
+    Endpoints for creating and reading requests (structured data extraction jobs). All non-2xx responses
+    use the uniform `{error, message, [details]}` envelope (see the `ApiError` schema).
+  humanURL: https://docs.superdial.com/introduction
+  baseURL: https://robodialer-service-api-9nc4t1p9.uc.gateway.dev
+  tags:
+  - Requests
+  properties:
+  - type: OpenAPI
+    url: openapi/superdial-requests-api-openapi.yml
+  - type: Documentation
+    url: https://docs.superdial.com/introduction
+  - type: APIReference
+    url: https://docs.superdial.com/api-reference/requests/create-a-request
+  - type: Webhooks
+    url: asyncapi/superdial-requests-webhooks.yml
+  - type: DataModel
+    url: data-model/superdial-data-model.yml
+- aid: superdial:superdial-schemas-api
+  name: SuperDial Schemas API
+  description: >-
+    Discover the schemas provisioned for your account and the required input keys for each. All non-2xx
+    responses use the uniform `{error, message, [details]}` envelope (see the `ApiError` schema).
+  humanURL: https://docs.superdial.com/introduction
+  baseURL: https://robodialer-service-api-9nc4t1p9.uc.gateway.dev
+  tags:
+  - Schemas
+  properties:
+  - type: OpenAPI
+    url: openapi/superdial-schemas-api-openapi.yml
+  - type: Documentation
+    url: https://docs.superdial.com/introduction
+  - type: APIReference
+    url: https://docs.superdial.com/api-reference/requests/create-a-request
+  - type: Webhooks
+    url: asyncapi/superdial-requests-webhooks.yml
+  - type: DataModel
+    url: data-model/superdial-data-model.yml
 maintainers:
 - FN: Kin Lane
   email: kin@apievangelist.com
 - FN: APIs.json
   email: info@apis.io
 common:
+- type: Overlay
+  url: overlays/superdial-api-overlay.yaml
 - type: Website
   url: https://www.superdial.com/
 - type: DeveloperPortal
