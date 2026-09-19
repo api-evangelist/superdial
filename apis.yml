@@ -93,6 +93,8 @@ apis:
   humanURL: https://docs.superdial.com/introduction
   baseURL: https://robodialer-service-api-9nc4t1p9.uc.gateway.dev
   tags:
+  - Schema
+  tags_raw:
   - Schemas
   properties:
   - type: OpenAPI
