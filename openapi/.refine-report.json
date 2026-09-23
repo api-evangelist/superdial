@@ -1,0 +1,24 @@
+{
+  "provider": "superdial",
+  "sources": [
+    "_original/superdial-openapi.json"
+  ],
+  "outputs": [
+    "superdial-authentication-api-openapi.yml",
+    "superdial-requests-api-openapi.yml",
+    "superdial-schemas-api-openapi.yml"
+  ],
+  "archived": [],
+  "errors": [],
+  "warnings": [],
+  "notes": [
+    "sourced from openapi/_original/ (1 archived document(s)); previously refined output at the top level was skipped rather than re-split",
+    "superdial-openapi.json: upgraded openapi 3.0.0 -> OpenAPI 3.2.0",
+    "apis.yml register: already-registered"
+  ],
+  "skipped": [
+    "superdial-authentication-api-openapi.yml: previously refined output, superseded by openapi/_original/",
+    "superdial-requests-api-openapi.yml: previously refined output, superseded by openapi/_original/",
+    "superdial-schemas-api-openapi.yml: previously refined output, superseded by openapi/_original/"
+  ]
+}

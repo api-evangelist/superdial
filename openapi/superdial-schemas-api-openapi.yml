@@ -1,0 +1,553 @@
+openapi: 3.2.0
+info:
+  description: SuperDial REST API Reference
+  version: 1.0.0
+  title: SuperDial Schemas API
+servers:
+- url: https://robodialer-service-api-9nc4t1p9.uc.gateway.dev
+  description: Production
+tags:
+- name: Schemas
+  description: Discover the schemas provisioned for your account and the required input keys for each. All non-2xx responses use the uniform `{error, message, [details]}` envelope (see the `ApiError` schema).
+paths:
+  /v1/schemas:
+    get:
+      tags:
+      - Schemas
+      summary: List schemas
+      description: Returns the schemas provisioned for your account. Each row carries a `requestType` (e.g. `claim-status`, `vob`) that identifies the kind of extraction the schema performs. Schemas that are no longer accessible for your account are filtered out.
+      security:
+      - bearerAuth: []
+      responses:
+        '200':
+          description: List of schemas the caller's account is provisioned for.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListSchemasResponse'
+              example:
+                schemas:
+                - schemaId: fWxzG4nqtpHsJxS5Lm3q
+                  name: Claim Status (Commercial)
+                  requestType: claim-status
+                - schemaId: qP2bN8rT6mK1xC3vW9aL
+                  name: Verification of Benefits
+                  requestType: vob
+        '401':
+          description: 'Unauthorized: enforced by the API gateway. Returned when the `Authorization: Bearer <token>` header is missing, malformed, or the token is invalid/expired.'
+          headers:
+            WWW-Authenticate:
+              description: Bearer realm and (when applicable) error code per RFC 6750.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GatewayErrorResponse'
+              examples:
+                missingAuth:
+                  summary: No Authorization header
+                  value:
+                    code: 401
+                    message: Jwt is missing
+                malformedJwt:
+                  summary: Authorization header value isn't a valid JWT
+                  value:
+                    code: 401
+                    message: Jwt is not in the form of Header.Payload.Signature with two dots and 3 sections
+        '404':
+          description: 'Account not found: the API key does not resolve to a provisioned account.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                error: ACCOUNT_NOT_FOUND
+                message: No account is associated with this API key. Contact support if you believe this is an error.
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                error: INTERNAL_ERROR
+                message: An internal error occurred. Please try again or contact support if the problem persists.
+      operationId: getV1Schemas
+      x-operation-id-source: derived
+  /v1/schemas/{schemaId}/required-inputs:
+    get:
+      tags:
+      - Schemas
+      summary: Required inputs for a schema
+      description: 'Returns the input keys required and optionally accepted to submit a request against this schema. Field names are returned verbatim. Use them as the keys of the `inputs` object on `POST /v1/requests`. Lists are sorted. This is the baseline: if your account is enabled for per-payer required inputs, some payers require additional fields not listed here, reported as `INVALID_INPUTS` on `POST /v1/requests`.'
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: schemaId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: The schema ID (from `GET /v1/schemas`). Must be non-blank, ≤1500 characters, contain no `/`, and must not start with `_` or `.`.
+      responses:
+        '200':
+          description: Sorted list of required input field names for this schema.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequiredInputsResponse'
+              example:
+                schemaId: fWxzG4nqtpHsJxS5Lm3q
+                requiredInputs:
+                  fields:
+                  - beginningDateOfService
+                  - billingProviderName
+                  - billingProviderTaxId
+                  - claimChargeAmount
+                  - memberId
+                  - patientDateOfBirth
+                  - patientFirstName
+                  - patientLastName
+                  - payerName
+                  - phoneNumber
+                  - renderingProviderName
+                  - renderingProviderNpi
+                optionalInputs:
+                  fields:
+                  - memberId2
+        '400':
+          description: Invalid `schemaId` path parameter (empty, contains `/`, starts with `_` or `.`, or exceeds 1500 characters).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                error: INVALID_REQUEST
+                message: The provided schemaId is invalid.
+        '401':
+          description: 'Unauthorized: enforced by the API gateway. Returned when the `Authorization: Bearer <token>` header is missing, malformed, or the token is invalid/expired.'
+          headers:
+            WWW-Authenticate:
+              description: Bearer realm and (when applicable) error code per RFC 6750.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GatewayErrorResponse'
+              examples:
+                missingAuth:
+                  summary: No Authorization header
+                  value:
+                    code: 401
+                    message: Jwt is missing
+        '404':
+          description: Schema not found, or account not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              examples:
+                schemaNotFound:
+                  summary: Schema not found, or has been retired and is no longer available for new requests
+                  value:
+                    error: SCHEMA_NOT_FOUND
+                    message: No schema with that ID exists for your account.
+                accountNotFound:
+                  summary: 'The API key resolves to an account that no longer exists. Rare: wrong-API-key cases hit `INVALID_API_KEY` at `/v1/auth` first.'
+                  value:
+                    error: ACCOUNT_NOT_FOUND
+                    message: No account is associated with this API key. Contact support if you believe this is an error.
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                error: INTERNAL_ERROR
+                message: An internal error occurred. Please try again or contact support if the problem persists.
+      operationId: getV1SchemasBySchemaIdRequiredInputs
+      x-operation-id-source: derived
+  /v1/schemas/{schemaId}/required-payer-inputs:
+    post:
+      tags:
+      - Schemas
+      summary: Resolve payer names against a schema's required inputs
+      description: 'Given a schema and a batch of payer names, returns the schema''s own required/optional inputs **plus** the per-payer required inputs for each name, so you can assemble the complete input set for a specific payer *before* calling `POST /v1/requests`, instead of discovering a payer-specific field from an `INVALID_INPUTS` rejection. The schema-level `requiredInputs`/`optionalInputs` are identical in shape and meaning to `GET /v1/schemas/{schemaId}/required-inputs`; `payers` adds the per-payer detail.
+
+
+        The response carries one `payers` entry per `payerNames` entry, in input order, with no de-duplication (positionally aligned 1:1 with the request array). Each entry is either **matched** (`inputPayerName`, `matchedPayerName`, `payerRequiredInputs.fields`) or a per-payer **error** (`inputPayerName`, `errorCode`, `message`). Discriminate on the presence of `errorCode`. A per-payer failure never fails the whole request; whole-request failures use the uniform `{error, message}` envelope.
+
+
+        **Opt-in.** Gated on the `enforcePayerRequiredInputs` account feature. When it is off the endpoint returns 403 `PAYER_REQUIRED_INPUTS_DISABLED`. This is the schema-keyed twin of `POST /v1/scripts/{scriptId}/required-payer-inputs`. See the Per-Payer Required Inputs guide.'
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: schemaId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: The schema ID (from `GET /v1/schemas`). Must be non-blank, ≤1500 characters, contain no `/`, and must not start with `_` or `.`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequiredPayerInputsRequest'
+            example:
+              payerNames:
+              - Sample Insurance Co
+              - Unknown Payer
+      responses:
+        '200':
+          description: Schema required/optional inputs plus one `payers` entry per requested name.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequiredPayerInputsResponse'
+              example:
+                schemaId: fWxzG4nqtpHsJxS5Lm3q
+                requiredInputs:
+                  fields:
+                  - beginningDateOfService
+                  - billingProviderName
+                  - billingProviderTaxId
+                  - claimChargeAmount
+                  - memberId
+                  - patientDateOfBirth
+                  - patientFirstName
+                  - patientLastName
+                  - payerName
+                  - phoneNumber
+                  - renderingProviderName
+                  - renderingProviderNpi
+                optionalInputs:
+                  fields:
+                  - memberId2
+                payers:
+                - inputPayerName: Sample Insurance Co
+                  matchedPayerName: Sample Insurance Company, Inc.
+                  payerRequiredInputs:
+                    fields:
+                    - claimNumber
+                - inputPayerName: Unknown Payer
+                  errorCode: PAYER_NOT_FOUND
+                  message: No canonical payer matched 'Unknown Payer'.
+        '400':
+          description: 'Invalid `schemaId` path parameter, or a malformed request body. Whole-request only: a bad *individual* payer name comes back inline as a `payers[]` error entry, not a 400.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              examples:
+                invalidSchemaId:
+                  summary: schemaId is empty, contains `/`, starts with `_` or `.`, or exceeds 1500 characters
+                  value:
+                    error: INVALID_REQUEST
+                    message: The provided schemaId is invalid.
+                bodyNotObject:
+                  summary: Body is missing or not a JSON object
+                  value:
+                    error: INVALID_REQUEST
+                    message: Request body must be a JSON object.
+                payerNamesNotArray:
+                  summary: '`payerNames` is absent or not an array'
+                  value:
+                    error: INVALID_REQUEST
+                    message: '`payerNames` must be a JSON array of strings.'
+                payerNamesEmpty:
+                  summary: '`payerNames` is an empty array'
+                  value:
+                    error: INVALID_REQUEST
+                    message: '`payerNames` must contain at least one entry.'
+                payerNamesTooMany:
+                  summary: '`payerNames` exceeds the 50-entry cap (no truncation: the whole request is rejected)'
+                  value:
+                    error: INVALID_REQUEST
+                    message: '`payerNames` may not exceed 50 entries.'
+        '401':
+          description: 'Unauthorized: enforced by the API gateway. Returned when the `Authorization: Bearer <token>` header is missing, malformed, or the token is invalid/expired.'
+          headers:
+            WWW-Authenticate:
+              description: Bearer realm and (when applicable) error code per RFC 6750.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GatewayErrorResponse'
+              examples:
+                missingAuth:
+                  summary: No Authorization header
+                  value:
+                    code: 401
+                    message: Jwt is missing
+        '403':
+          description: 'Per-payer required inputs is not enabled for your account. Opt-in feature: contact your account manager.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                error: PAYER_REQUIRED_INPUTS_DISABLED
+                message: Payer-required inputs are available as an opt-in feature but are not currently enabled for your account. Reach out to your account manager to request access.
+        '404':
+          description: Schema not found, or account not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              examples:
+                schemaNotFound:
+                  summary: Schema not found, or has been retired and is no longer available for new requests
+                  value:
+                    error: SCHEMA_NOT_FOUND
+                    message: No schema with that ID exists for your account.
+                accountNotFound:
+                  summary: 'The API key resolves to an account that no longer exists. Rare: wrong-API-key cases hit `INVALID_API_KEY` at `/v1/auth` first.'
+                  value:
+                    error: ACCOUNT_NOT_FOUND
+                    message: No account is associated with this API key. Contact support if you believe this is an error.
+        '500':
+          description: Internal server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                error: INTERNAL_ERROR
+                message: An internal error occurred. Please try again or contact support if the problem persists.
+      operationId: postV1SchemasBySchemaIdRequiredPayerInputs
+      x-operation-id-source: derived
+components:
+  schemas:
+    SchemaSummary:
+      type: object
+      description: One row in the `GET /v1/schemas` response.
+      required:
+      - schemaId
+      - name
+      - requestType
+      properties:
+        schemaId:
+          type: string
+          description: Stable identifier for the schema. Pass to `POST /v1/requests` as `schemaId`.
+        name:
+          type: string
+          description: Human-readable schema name. Falls back to the `schemaId` if no name was set.
+        requestType:
+          type: string
+          description: The kind of extraction this schema produces (e.g. `vob`, `claim-status`). Server-derived; surfaces on `RequestResponse.requestType` after the request runs. You don't need to pass it on `POST /v1/requests`.
+    RequiredInputsResponse:
+      type: object
+      description: 'Success response from `GET /v1/schemas/{schemaId}/required-inputs`. Carries both required and optional input field lists; the two are disjoint: if a name is required by any source, it appears only in `requiredInputs.fields`.'
+      required:
+      - schemaId
+      - requiredInputs
+      - optionalInputs
+      properties:
+        schemaId:
+          type: string
+          description: Echoes the path parameter.
+        requiredInputs:
+          type: object
+          required:
+          - fields
+          properties:
+            fields:
+              type: array
+              items:
+                type: string
+              description: 'Sorted list of required input field names. Use these as the keys of the `inputs` object on `POST /v1/requests`. Returned verbatim: the names are exactly what the request validator expects. This is the baseline; with per-payer required inputs enabled, some payers require additional fields not listed here.'
+        optionalInputs:
+          type: object
+          required:
+          - fields
+          properties:
+            fields:
+              type: array
+              items:
+                type: string
+              description: Sorted list of optional input field names, accepted but not required by `POST /v1/requests`. Disjoint from `requiredInputs.fields`.
+    MatchedPayerEntry:
+      type: object
+      description: 'A `payers[]` entry for a name that resolved to a canonical payer. The resolved phone number is intentionally omitted: dialing happens server-side and is never echoed back.'
+      required:
+      - inputPayerName
+      - matchedPayerName
+      - payerRequiredInputs
+      properties:
+        inputPayerName:
+          type: string
+          description: Echoes the requested name (trimmed of surrounding whitespace), verbatim.
+        matchedPayerName:
+          type: string
+          description: Canonical payer name SuperDial matched. Compare against `inputPayerName` to confirm the match landed where you expected.
+        payerRequiredInputs:
+          type: object
+          required:
+          - fields
+          properties:
+            fields:
+              type: array
+              items:
+                type: string
+              description: Sorted list of the **additional** required-input field names this payer needs, beyond the schema-level `requiredInputs.fields`, not the full set (it may be empty when the payer adds nothing). Union it with `requiredInputs.fields` to get everything a request for this payer must supply to avoid an `INVALID_INPUTS` rejection.
+    ListSchemasResponse:
+      type: object
+      description: Success response from `GET /v1/schemas`.
+      required:
+      - schemas
+      properties:
+        schemas:
+          type: array
+          items:
+            $ref: '#/components/schemas/SchemaSummary'
+          description: Schemas that have been retired or hidden for your account are filtered out of this list.
+    RequiredPayerInputsRequest:
+      type: object
+      description: Request body for `POST /v1/schemas/{schemaId}/required-payer-inputs`.
+      required:
+      - payerNames
+      properties:
+        payerNames:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            type: string
+          description: Payer names to resolve, 1–50 per request. Resolved independently, in order, with no de-duplication. The response's `payers` array is positionally aligned 1:1 with this array. More than 50 entries returns 400 `INVALID_REQUEST` (no truncation). A blank/whitespace-only entry is not a whole-request error. It comes back as a per-payer `INVALID_PAYER_NAME` entry in `payers`.
+      example:
+        payerNames:
+        - Sample Insurance Co
+        - Unknown Payer
+    RequiredPayerInputsResponse:
+      type: object
+      description: Success body from `POST /v1/schemas/{schemaId}/required-payer-inputs`. Carries the schema's own `requiredInputs`/`optionalInputs` (identical shape and semantics to `GET /v1/schemas/{schemaId}/required-inputs`) plus a `payers` array with one entry per requested name.
+      required:
+      - schemaId
+      - requiredInputs
+      - optionalInputs
+      - payers
+      properties:
+        schemaId:
+          type: string
+          description: Echoes the path parameter.
+        requiredInputs:
+          type: object
+          required:
+          - fields
+          properties:
+            fields:
+              type: array
+              items:
+                type: string
+              description: 'Sorted schema-level required input field names: the baseline every request against this schema needs, independent of payer.'
+        optionalInputs:
+          type: object
+          required:
+          - fields
+          properties:
+            fields:
+              type: array
+              items:
+                type: string
+              description: Sorted schema-level optional input field names. Disjoint from `requiredInputs.fields`.
+        payers:
+          type: array
+          description: One entry per `payerNames` entry, in input order, with no de-duplication (positionally aligned 1:1 with the request). Each item is either a `MatchedPayerEntry` or a `PayerInputError`. Discriminate on the presence of `errorCode`.
+          items:
+            oneOf:
+            - $ref: '#/components/schemas/MatchedPayerEntry'
+            - $ref: '#/components/schemas/PayerInputError'
+    ApiError:
+      type: object
+      description: Uniform error envelope returned by every non-2xx response from `/v1/requests` and `/v1/schemas`. The `error` field is a stable machine-readable code; the `message` field is a human-readable description safe to surface to end users; `details` (optional) carries the structured `missingInputs` / `invalidInputs` block on the `INVALID_INPUTS` path. Unmatched paths and unsupported HTTP methods fall back to the framework's default response (typically HTML); use a documented endpoint and method to receive this envelope.
+      required:
+      - error
+      - message
+      properties:
+        error:
+          type: string
+          enum:
+          - INVALID_REQUEST
+          - INVALID_INPUTS
+          - PAYER_NOT_FOUND
+          - ACCOUNT_NOT_FOUND
+          - SCHEMA_NOT_FOUND
+          - REQUEST_NOT_FOUND
+          - INTERNAL_ERROR
+          - PAYER_LOOKUP_FAILURE
+          - PAYER_REQUIRED_INPUTS_DISABLED
+          description: Machine-readable error code for the HTTP envelope. See [Creating a Request → Error handling](/guides/creating-a-request#error-handling) for what each code means, when it fires, and how to handle it.
+        message:
+          type: string
+          description: Human-readable error description. Never contains stack traces or internal identifiers.
+        details:
+          type: object
+          description: '**Optional.** Currently set only for `INVALID_INPUTS`, where it contains `missingInputs` (array of field names) and/or `invalidInputs` (object mapping field name to reason). See the [Input Validation](/guides/input-validation) guide for the full set of rules behind these reasons.'
+          properties:
+            missingInputs:
+              type: array
+              description: Field names that were required but absent, null, or empty/whitespace-only.
+              items:
+                type: string
+            invalidInputs:
+              type: object
+              description: Maps each rejected field name to a human-readable reason (e.g. `phoneNumber is not a valid U.S. phone number`, `claimChargeAmount is scientific notation`, `memberId contains invalid characters (curly braces)`, or a member-ID structure message).
+              additionalProperties:
+                type: string
+    GatewayErrorResponse:
+      type: object
+      description: 'Error envelope returned by the API Gateway for auth failures and routing errors. Distinct from the service''s own `ApiError` envelope: gateway responses use `{code, message}` because they''re produced before the request reaches the service.'
+      properties:
+        code:
+          type: integer
+          description: HTTP status code, repeated in the body.
+          example: 401
+        message:
+          type: string
+          description: Human-readable error message from the gateway.
+          example: Jwt is missing
+      required:
+      - code
+      - message
+    PayerInputError:
+      type: object
+      description: 'A `payers[]` entry for a name that could not be resolved. This is an inline, per-payer error: it does not fail the whole request. Distinguished from `MatchedPayerEntry` by the presence of `errorCode`.'
+      required:
+      - inputPayerName
+      - errorCode
+      - message
+      properties:
+        inputPayerName:
+          type: string
+          description: Echoes the requested name, verbatim (empty string when the input was blank/whitespace-only).
+        errorCode:
+          type: string
+          enum:
+          - INVALID_PAYER_NAME
+          - PAYER_NOT_FOUND
+          - PAYER_LOOKUP_FAILURE
+          description: '`INVALID_PAYER_NAME`: the entry was blank/whitespace-only, so no lookup ran. `PAYER_NOT_FOUND`: no canonical payer matched the name. `PAYER_LOOKUP_FAILURE`: the lookup errored transiently; retry that name. These codes are scoped to this array and are distinct from the whole-request `{error, message}` envelope.'
+        message:
+          type: string
+          description: Human-readable description of the per-payer failure.
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: Robodialer-API-Key
+      description: Your SuperDial API key
+    apiSecret:
+      type: apiKey
+      in: header
+      name: Robodialer-API-Secret
+      description: Your SuperDial API secret
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token obtained from the /v1/auth endpoint

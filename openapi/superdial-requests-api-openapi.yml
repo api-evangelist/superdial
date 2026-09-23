@@ -1,0 +1,1393 @@
+openapi: 3.2.0
+info:
+  description: SuperDial REST API Reference
+  version: 1.0.0
+  title: SuperDial Requests API
+servers:
+- url: https://robodialer-service-api-9nc4t1p9.uc.gateway.dev
+  description: Production
+tags:
+- name: Requests
+  description: Endpoints for creating and reading requests (structured data extraction jobs). All non-2xx responses use the uniform `{error, message, [details]}` envelope (see the `ApiError` schema).
+paths:
+  /v1/requests:
+    post:
+      tags:
+      - Requests
+      summary: Create a Request
+      description: 'Submit a single request or a batch of requests. For batch, wrap in `{"requests": [...]}`. If `internalId` is supplied on a single request, a duplicate POST with the same `internalId` returns the previously reserved `requestId` rather than creating a new one.'
+      security:
+      - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+              - $ref: '#/components/schemas/CreateRequestPayload'
+              - $ref: '#/components/schemas/CreateRequestBatchPayload'
+            examples:
+              single:
+                summary: Single request
+                value:
+                  schemaId: fWxzG4nqtpHsJxS5Lm3q
+                  inputs:
+                    payerName: Sample Insurance Co
+                    memberId: TEST123456789
+                    phoneNumber: '2125551234'
+                    providerNpi: '1234567890'
+                    dateOfService: '2026-03-15'
+                  internalId: claim_internal_456
+              batch:
+                summary: 'Batch: multiple requests in one POST'
+                value:
+                  requests:
+                  - schemaId: fWxzG4nqtpHsJxS5Lm3q
+                    inputs:
+                      payerName: Sample Insurance Co
+                      memberId: TEST123456789
+                      phoneNumber: '2125551234'
+                      providerNpi: '1234567890'
+                      dateOfService: '2026-03-15'
+                    internalId: claim_001
+                  - schemaId: fWxzG4nqtpHsJxS5Lm3q
+                    inputs:
+                      payerName: Sample Insurance Co
+                      memberId: TEST987654321
+                      phoneNumber: '2125551234'
+                      providerNpi: '1234567890'
+                      dateOfService: '2026-03-12'
+                    internalId: claim_002
+      responses:
+        '200':
+          description: Request(s) created successfully. The body is `CreateRequestSuccess` for a single-item POST and `CreateRequestBatchResponse` (with every entry a success) for a batch.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/CreateRequestSuccess'
+                - $ref: '#/components/schemas/CreateRequestBatchResponse'
+              examples:
+                single:
+                  summary: 'Single: request created'
+                  value:
+                    requestId: 8bF7xK2mP9qR4sT6uV0w
+                    requestBatchId: pH9kJ2lM4nB6vC8xZ7Qr
+                    internalId: claim_internal_456
+                singleWithPayerLookup:
+                  summary: 'Single: request created, plus synchronous payer phone number lookup succeeded (payerName supplied without phoneNumber)'
+                  value:
+                    requestId: 8bF7xK2mP9qR4sT6uV0w
+                    requestBatchId: pH9kJ2lM4nB6vC8xZ7Qr
+                    internalId: claim_internal_456
+                    payerLookup:
+                      inputPayerName: Sample Insurance Co
+                      inputPhoneNumber: null
+                      matchedPayerName: Sample Insurance Company, Inc.
+                      matchedPayerPhone: '8005551234'
+                      phoneNumberToUse: '8005551234'
+                      phoneNumberSource: superdial
+                singleIdempotentReplay:
+                  summary: 'Single: idempotent replay (same internalId returns the original requestId)'
+                  value:
+                    requestId: 8bF7xK2mP9qR4sT6uV0w
+                    requestBatchId: pH9kJ2lM4nB6vC8xZ7Qr
+                    internalId: claim_internal_456
+                batch:
+                  summary: 'Batch: every entry created successfully'
+                  value:
+                    requests:
+                    - requestId: 8bF7xK2mP9qR4sT6uV0w
+                      requestBatchId: pH9kJ2lM4nB6vC8xZ7Qr
+                      internalId: claim_001
+                    - requestId: aC3hN5jD8eL1fM2gK6Yo
+                      requestBatchId: pH9kJ2lM4nB6vC8xZ7Qr
+                      internalId: claim_002
+        '207':
+          description: 'Partial success (batch only): at least one entry succeeded and at least one failed (validation, lookup, or server error). Each failed entry uses the `ApiError` envelope; succeeded entries use `CreateRequestSuccess`. The batch response itself does not carry a top-level error.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateRequestBatchResponse'
+              examples:
+                batchMixed:
+                  summary: 'Batch: one entry created, one failed validation'
+                  value:
+                    requests:
+                    - requestId: 8bF7xK2mP9qR4sT6uV0w
+                      requestBatchId: pH9kJ2lM4nB6vC8xZ7Qr
+                      internalId: claim_001
+                    - error: INVALID_REQUEST
+                      message: schemaId is required
+        '400':
+          description: 'Validation error. The body is always an `ApiError` envelope, except when every entry of a batch failed validation. In that case the body is a `CreateRequestBatchResponse` and each entry is its own `ApiError`. Codes returned at this status: `INVALID_REQUEST` (payload-shape, missing required fields, scheduling-capacity errors) and `INVALID_INPUTS` (input validation, with `details.missingInputs` and/or `details.invalidInputs`). With per-payer required inputs enabled, `details.missingInputs` can also include inputs a payer requires beyond the schema fields.'
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/ApiError'
+                - $ref: '#/components/schemas/CreateRequestBatchResponse'
+              examples:
+                bodyNotJsonObject:
+                  summary: Body is missing, empty, or not a JSON object (e.g. a JSON array)
+                  value:
+                    error: INVALID_REQUEST
+                    message: The request body must be a JSON object.
+                schemaIdRequired:
+                  summary: 'Single: schemaId missing'
+                  value:
+                    error: INVALID_REQUEST
+                    message: schemaId is required
+                inputsNotObject:
+                  summary: 'Single: inputs is not a JSON object'
+                  value:
+                    error: INVALID_REQUEST
+                    message: inputs must be an object
+                inputsMissing:
+                  summary: Required schema inputs are missing (details lists every missing field)
+                  value:
+                    error: INVALID_INPUTS
+                    message: Required inputs are missing or invalid.
+                    details:
+                      missingInputs:
+                      - beginningDateOfService
+                      - billingProviderName
+                      - billingProviderTaxId
+                      - claimChargeAmount
+                      - memberId
+                      - patientDateOfBirth
+                      - patientFirstName
+                      - patientLastName
+                      - phoneNumber
+                      - renderingProviderName
+                      - renderingProviderNpi
+                inputsInvalid:
+                  summary: Required inputs missing AND format-invalid (details has both blocks)
+                  value:
+                    error: INVALID_INPUTS
+                    message: Required inputs are missing or invalid.
+                    details:
+                      missingInputs:
+                      - beginningDateOfService
+                      - billingProviderName
+                      - billingProviderTaxId
+                      - claimChargeAmount
+                      - patientDateOfBirth
+                      - patientFirstName
+                      - patientLastName
+                      - renderingProviderName
+                      - renderingProviderNpi
+                      invalidInputs:
+                        memberId: memberId contains invalid characters (curly braces)
+                        phoneNumber: phoneNumber is not a valid U.S. phone number
+                inputsFormatInvalid:
+                  summary: Format rules applied to supplied values. See the Input Validation guide for every rule
+                  value:
+                    error: INVALID_INPUTS
+                    message: Required inputs are missing or invalid.
+                    details:
+                      invalidInputs:
+                        claimChargeAmount: claimChargeAmount is scientific notation
+                        dateOfService: dateOfService is invalid
+                        phoneNumber: phoneNumber is not a valid U.S. phone number
+                memberIdRejected:
+                  summary: 'Member-ID validation (only when enabled for your account): here a BCBS payer with a too-short memberId'
+                  value:
+                    error: INVALID_INPUTS
+                    message: Required inputs are missing or invalid.
+                    details:
+                      invalidInputs:
+                        memberId: memberId 'ABC' is too short to be a BCBS member ID (got 3 characters, minimum is 9). BCBS Federal IDs are 9 chars (R + 8 digits); commercial IDs are typically 11+.
+                dailyLimitZero:
+                  summary: Daily call limit on the account is configured at 0
+                  value:
+                    error: INVALID_REQUEST
+                    message: 'Daily calls limit is set to 0: cannot schedule batches'
+                capacityExceeded:
+                  summary: Account is fully booked beyond the 365-day scheduling horizon
+                  value:
+                    error: INVALID_REQUEST
+                    message: 'Could not schedule all rows within 365 days: 5 of 100 rows could not be placed'
+                batchEmpty:
+                  summary: 'Batch: requests array missing or empty'
+                  value:
+                    error: INVALID_REQUEST
+                    message: The 'requests' array must contain at least one entry.
+                payerNotFound:
+                  summary: 'Payer phone number lookup: `payerName` did not match any known payer (only fires when `phoneNumber` was omitted).'
+                  value:
+                    error: PAYER_NOT_FOUND
+                    message: Could not match the supplied payerName to any known payer.
+                batchAllFailed:
+                  summary: 'Batch: every entry failed validation (per-entry envelopes; HTTP 400 because no entry succeeded and no entry hit a server error). Note: schema-not-found surfaces here as `INVALID_REQUEST` with the validator''s `Schema not found` message because batch entries don''t carry status codes. Read `message` to distinguish 4xx causes.'
+                  value:
+                    requests:
+                    - error: INVALID_REQUEST
+                      message: Schema not found
+                    - error: INVALID_REQUEST
+                      message: schemaId is required
+        '401':
+          description: 'Unauthorized: enforced by the API gateway. Returned when the `Authorization: Bearer <token>` header is missing, malformed, or the token is invalid/expired. The gateway uses its own envelope (`{code, message}`), distinct from the service''s `ApiError`.'
+          headers:
+            WWW-Authenticate:
+              description: Bearer realm and (when applicable) error code per RFC 6750.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GatewayErrorResponse'
+              examples:
+                missingAuth:
+                  summary: No Authorization header
+                  value:
+                    code: 401
+                    message: Jwt is missing
+                malformedJwt:
+                  summary: Authorization header value isn't a valid JWT
+                  value:
+                    code: 401
+                    message: Jwt is not in the form of Header.Payload.Signature with two dots and 3 sections
+        '404':
+          description: 'Resource not found: schema or account.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              examples:
+                schemaNotFound:
+                  summary: schemaId does not exist for this account, or has been retired
+                  value:
+                    error: SCHEMA_NOT_FOUND
+                    message: No schema with that ID exists for your account.
+                accountNotFound:
+                  summary: 'The API key resolves to an account that no longer exists. Rare: wrong-API-key cases hit `INVALID_API_KEY` at `/v1/auth` first.'
+                  value:
+                    error: ACCOUNT_NOT_FOUND
+                    message: No account is associated with this API key. Contact support if you believe this is an error.
+        '500':
+          description: 'Internal server error. **Single-item POST:** body is the top-level `INTERNAL_ERROR` envelope. **Batch POST:** body can take **either** of two shapes: top-level `INTERNAL_ERROR` envelope (the common case), or `{"requests": [...]}` with per-entry envelopes (rarer: every entry failed and at least one was a server error). Check for the `requests` key to tell the two shapes apart.'
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - $ref: '#/components/schemas/ApiError'
+                - $ref: '#/components/schemas/CreateRequestBatchResponse'
+              examples:
+                singleInternalError:
+                  summary: 'Single: unexpected server failure'
+                  value:
+                    error: INTERNAL_ERROR
+                    message: An internal error occurred. Please try again or contact support if the problem persists.
+                payerLookupFailure:
+                  summary: 'Payer phone number lookup: matched a payer but no phone on file, or transient infra failure. Retry with backoff.'
+                  value:
+                    error: PAYER_LOOKUP_FAILURE
+                    message: Could not retrieve a phone number for the resolved payer. Please retry, or supply phoneNumber explicitly.
+                batchInternalError:
+                  summary: 'Batch: exception raised mid-processing (most common). Top-level `ApiError` envelope, no `requests` key.'
+                  value:
+                    error: INTERNAL_ERROR
+                    message: An internal error occurred. Please try again or contact support if the problem persists.
+                batchAllServerErrors:
+                  summary: 'Batch: every entry failed and at least one was a server error (rarer; per-entry shape). Server-error entries surface as `INVALID_REQUEST` with the underlying message (the per-entry translator does not propagate `INTERNAL_ERROR`).'
+                  value:
+                    requests:
+                    - error: INVALID_REQUEST
+                      message: Failed to enqueue request
+                    - error: INVALID_REQUEST
+                      message: schemaId is required
+      operationId: postV1Requests
+      x-operation-id-source: derived
+    get:
+      tags:
+      - Requests
+      summary: List Requests
+      description: Retrieve requests filtered by date range or batch ID.
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: dateFrom
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+        description: '**Optional.** Start of the `dateCreated` window (inclusive), `YYYY-MM-DD`. Interpreted as UTC midnight. When omitted (and `requestBatchId` is also omitted), defaults to today in the server''s clock.'
+      - name: dateTo
+        in: query
+        required: false
+        schema:
+          type: string
+          format: date
+        description: '**Optional.** End of the `dateCreated` window (**exclusive**), `YYYY-MM-DD`. Interpreted as UTC midnight. When omitted (and `requestBatchId` is also omitted), defaults to tomorrow in the server''s clock.'
+      - name: requestBatchId
+        in: query
+        required: false
+        schema:
+          type: string
+        description: '**Optional.** Return every request belonging to this `requestBatchId`. Bypasses the `dateFrom`/`dateTo` defaults. Passing this returns matching requests regardless of when they were created.'
+      responses:
+        '200':
+          description: List of requests. The list endpoint omits `transcript`, `transcriptPostCall`, and `recordingDownloadUrl`. Fetch `GET /v1/requests/{requestId}` for those. Every other field on `RequestResponse` (including `state`, `modality`, `data_completeness`, `error`) is included when applicable.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requests:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/RequestResponse'
+              examples:
+                list:
+                  summary: Four requests showing one of each state (SUCCESS, PARTIAL, FAILURE, PROCESSING)
+                  value:
+                    requests:
+                    - requestId: 8bF7xK2mP9qR4sT6uV0w
+                      requestBatchId: pH9kJ2lM4nB6vC8xZ7Qr
+                      schemaId: fWxzG4nqtpHsJxS5Lm3q
+                      requestType: claim-status
+                      state: SUCCESS
+                      inputs:
+                        payerName: Sample Insurance Co
+                        memberId: TEST123456789
+                        patientFirstName: Sample
+                        patientLastName: Patient
+                        patientDateOfBirth: '1990-01-15'
+                        beginningDateOfService: '2026-03-15'
+                        billingProviderName: Test Clinic LLC
+                        billingProviderTaxId: '999999999'
+                        renderingProviderName: Dr Test Provider
+                        renderingProviderNpi: '1234567890'
+                        claimChargeAmount: '150.00'
+                        phoneNumber: '2125551234'
+                      results:
+                        claimStatus: PAID
+                        paidAmount: '150.00'
+                        checkNumber: CHK998877
+                        paidDate: '2026-04-10'
+                      missingFields: []
+                      dateCreated: '2026-04-24T15:30:00.123456+00:00'
+                      completedAt: '2026-04-24T15:32:18.987654+00:00'
+                      dueDate: '2026-04-25T23:00:00+00:00'
+                      internalId: claim_internal_001
+                      internalTag: march-batch
+                      modality: phone_only
+                      data_completeness: null
+                      error: null
+                      to: '+12125551234'
+                      callDuration: 00:08:42
+                      callSummary: Verified claim status as PAID.
+                    - requestId: kT9bR2mP6nE3yV1xD7Aq
+                      requestBatchId: pH9kJ2lM4nB6vC8xZ7Qr
+                      schemaId: fWxzG4nqtpHsJxS5Lm3q
+                      requestType: claim-status
+                      state: PARTIAL
+                      inputs:
+                        payerName: Sample Insurance Co
+                        memberId: TEST555444333
+                        patientFirstName: Sample
+                        patientLastName: Patient
+                        patientDateOfBirth: '1990-01-15'
+                        beginningDateOfService: '2026-03-15'
+                        billingProviderName: Test Clinic LLC
+                        billingProviderTaxId: '999999999'
+                        renderingProviderName: Dr Test Provider
+                        renderingProviderNpi: '1234567890'
+                        claimChargeAmount: '150.00'
+                        phoneNumber: '2125551234'
+                      results:
+                        claimStatus: PAID
+                        paidAmount: '150.00'
+                      missingFields:
+                      - checkNumber
+                      - paidDate
+                      dateCreated: '2026-04-24T15:33:10.123000+00:00'
+                      completedAt: '2026-04-24T15:36:42.456000+00:00'
+                      dueDate: '2026-04-25T23:00:00+00:00'
+                      internalId: claim_internal_002
+                      internalTag: march-batch
+                      modality: digital_plus_phone
+                      data_completeness: null
+                      error: null
+                      to: '+12125551234'
+                      callDuration: 00:06:24
+                      callSummary: Confirmed the claim is PAID for $150.00 on the primary call; a follow-up call for the check number and paid date did not complete.
+                    - requestId: nQ4rW8sT1vY3zE5xC2bV
+                      requestBatchId: pH9kJ2lM4nB6vC8xZ7Qr
+                      schemaId: fWxzG4nqtpHsJxS5Lm3q
+                      requestType: claim-status
+                      state: FAILURE
+                      inputs:
+                        payerName: Sample Insurance Co
+                        memberId: BADID000
+                        patientFirstName: Sample
+                        patientLastName: Patient
+                        patientDateOfBirth: '1990-01-15'
+                        beginningDateOfService: '2026-03-15'
+                        billingProviderName: Test Clinic LLC
+                        billingProviderTaxId: '999999999'
+                        renderingProviderName: Dr Test Provider
+                        renderingProviderNpi: '1234567890'
+                        claimChargeAmount: '150.00'
+                        phoneNumber: '2125551234'
+                      results: {}
+                      missingFields: []
+                      dateCreated: '2026-04-24T15:32:00.000000+00:00'
+                      completedAt: '2026-04-24T15:35:11.222333+00:00'
+                      dueDate: '2026-04-25T23:00:00+00:00'
+                      internalId: claim_internal_003
+                      internalTag: march-batch
+                      modality: phone_only
+                      data_completeness: null
+                      error:
+                        errorCategory: NOT_FOUND
+                        errorCode: MEMBER_NOT_FOUND
+                        errorMessage: Member could not be located
+                      to: '+12125551234'
+                      callDuration: 00:04:11
+                      callSummary: Representative could not locate the member; lookup failed.
+                    - requestId: aC3hN5jD8eL1fM2gK6Yo
+                      requestBatchId: pH9kJ2lM4nB6vC8xZ7Qr
+                      schemaId: fWxzG4nqtpHsJxS5Lm3q
+                      requestType: claim-status
+                      state: PROCESSING
+                      inputs:
+                        payerName: Sample Insurance Co
+                        memberId: TEST987654321
+                        patientFirstName: Sample
+                        patientLastName: Patient
+                        patientDateOfBirth: '1990-01-15'
+                        beginningDateOfService: '2026-03-15'
+                        billingProviderName: Test Clinic LLC
+                        billingProviderTaxId: '999999999'
+                        renderingProviderName: Dr Test Provider
+                        renderingProviderNpi: '1234567890'
+                        claimChargeAmount: '150.00'
+                        phoneNumber: '2125551234'
+                      results: {}
+                      missingFields: []
+                      dateCreated: '2026-04-24T15:31:02.456789+00:00'
+                      completedAt: null
+                      dueDate: '2026-04-25T23:00:00+00:00'
+                      internalId: claim_internal_004
+                      internalTag: march-batch
+                      modality: null
+                      data_completeness: null
+                      error: null
+                empty:
+                  summary: No requests matched the window
+                  value:
+                    requests: []
+        '401':
+          description: 'Unauthorized: enforced by the API gateway. Returned when the `Authorization: Bearer <token>` header is missing, malformed, or the token is invalid/expired.'
+          headers:
+            WWW-Authenticate:
+              description: Bearer realm and (when applicable) error code per RFC 6750.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GatewayErrorResponse'
+              examples:
+                missingAuth:
+                  summary: No Authorization header
+                  value:
+                    code: 401
+                    message: Jwt is missing
+                malformedJwt:
+                  summary: Authorization header value isn't a valid JWT
+                  value:
+                    code: 401
+                    message: Jwt is not in the form of Header.Payload.Signature with two dots and 3 sections
+        '400':
+          description: Invalid query parameter.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              examples:
+                invalidDateFrom:
+                  summary: '`dateFrom` is not a valid `YYYY-MM-DD` date'
+                  value:
+                    error: INVALID_REQUEST
+                    message: dateFrom must be a YYYY-MM-DD date.
+                invalidDateTo:
+                  summary: '`dateTo` is not a valid `YYYY-MM-DD` date'
+                  value:
+                    error: INVALID_REQUEST
+                    message: dateTo must be a YYYY-MM-DD date.
+        '404':
+          description: 'Account not found: the API key does not resolve to a provisioned account.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                error: ACCOUNT_NOT_FOUND
+                message: No account is associated with this API key. Contact support if you believe this is an error.
+        '500':
+          description: Internal server error. Retry once; escalate if persistent.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                error: INTERNAL_ERROR
+                message: An internal error occurred. Please try again or contact support if the problem persists.
+      operationId: getV1Requests
+      x-operation-id-source: derived
+  /v1/requests/{requestId}:
+    get:
+      tags:
+      - Requests
+      summary: Retrieve a Request
+      description: Fetch details for a request by ID.
+      security:
+      - bearerAuth: []
+      parameters:
+      - name: requestId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: The request ID
+      responses:
+        '200':
+          description: Request retrieved successfully. Single-request reads include phone-call enrichment fields (`transcript`, `recordingDownloadUrl`, etc.) when a representative call has completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestResponse'
+              examples:
+                success:
+                  summary: 'Successfully retrieved a request that completed with results: every required field populated.'
+                  value:
+                    requestId: 8bF7xK2mP9qR4sT6uV0w
+                    requestBatchId: pH9kJ2lM4nB6vC8xZ7Qr
+                    schemaId: fWxzG4nqtpHsJxS5Lm3q
+                    requestType: claim-status
+                    state: SUCCESS
+                    inputs:
+                      payerName: Sample Insurance Co
+                      memberId: TEST123456789
+                      patientFirstName: Sample
+                      patientLastName: Patient
+                      patientDateOfBirth: '1990-01-15'
+                      beginningDateOfService: '2026-03-15'
+                      billingProviderName: Test Clinic LLC
+                      billingProviderTaxId: '999999999'
+                      renderingProviderName: Dr Test Provider
+                      renderingProviderNpi: '1234567890'
+                      claimChargeAmount: '150.00'
+                      phoneNumber: '2125551234'
+                    results:
+                      claimStatus: PAID
+                      paidAmount: '150.00'
+                      checkNumber: CHK998877
+                      paidDate: '2026-04-10'
+                    missingFields: []
+                    dateCreated: '2026-04-24T15:30:00.123456+00:00'
+                    completedAt: '2026-04-24T15:32:18.987654+00:00'
+                    dueDate: '2026-04-25T23:00:00+00:00'
+                    internalId: claim_internal_001
+                    internalTag: march-batch
+                    modality: phone_only
+                    data_completeness: null
+                    error: null
+                    to: '+12125551234'
+                    transcript: 'SuperDial Agent: Hi, I''m calling to check on a claim status for member TEST123456789.
+
+                      Representative: Let me look that up for you...'
+                    recordingDownloadUrl: https://storage.googleapis.com/sd-recordings/.../recording.mp3?X-Goog-Signature=...
+                    callDuration: 00:08:42
+                    callSummary: 'Verified claim status as PAID. Check #CHK998877 issued on 2026-04-10 for $150.00.'
+                    callAuditSummary: All claim status questions answered. Representative confirmed paid amount and check number.
+                successDigitalOnly:
+                  summary: 'SUCCESS via digital channels only: `data_completeness` is `"minimum"` to flag that a phone call could have yielded richer data.'
+                  value:
+                    requestId: rD2bV4mK7nE9yX1cP5Lo
+                    requestBatchId: pH9kJ2lM4nB6vC8xZ7Qr
+                    schemaId: fWxzG4nqtpHsJxS5Lm3q
+                    requestType: claim-status
+                    state: SUCCESS
+                    inputs:
+                      payerName: Sample Insurance Co
+                      memberId: TEST111222333
+                      patientFirstName: Sample
+                      patientLastName: Patient
+                      patientDateOfBirth: '1990-01-15'
+                      beginningDateOfService: '2026-03-15'
+                      billingProviderName: Test Clinic LLC
+                      billingProviderTaxId: '999999999'
+                      renderingProviderName: Dr Test Provider
+                      renderingProviderNpi: '1234567890'
+                      claimChargeAmount: '150.00'
+                      phoneNumber: '2125551234'
+                    results:
+                      claimStatus: PAID
+                      paidAmount: '150.00'
+                      checkNumber: CHK112233
+                      paidDate: '2026-04-12'
+                    missingFields: []
+                    dateCreated: '2026-04-24T15:35:00.123456+00:00'
+                    completedAt: '2026-04-24T15:35:08.456789+00:00'
+                    dueDate: '2026-04-25T23:00:00+00:00'
+                    internalId: claim_internal_005
+                    internalTag: march-batch
+                    modality: digital_only
+                    data_completeness: minimum
+                    error: null
+                failureNoResults:
+                  summary: 'FAILURE: payer rejected the lookup outright. `state: "FAILURE"`, `results` is empty (no fields ever captured), `error` describes the cause.'
+                  value:
+                    requestId: nQ4rW8sT1vY3zE5xC2bV
+                    requestBatchId: pH9kJ2lM4nB6vC8xZ7Qr
+                    schemaId: fWxzG4nqtpHsJxS5Lm3q
+                    requestType: claim-status
+                    state: FAILURE
+                    inputs:
+                      payerName: Sample Insurance Co
+                      memberId: BADID000
+                      patientFirstName: Sample
+                      patientLastName: Patient
+                      patientDateOfBirth: '1990-01-15'
+                      beginningDateOfService: '2026-03-15'
+                      billingProviderName: Test Clinic LLC
+                      billingProviderTaxId: '999999999'
+                      renderingProviderName: Dr Test Provider
+                      renderingProviderNpi: '1234567890'
+                      claimChargeAmount: '150.00'
+                      phoneNumber: '2125551234'
+                    results: {}
+                    missingFields: []
+                    dateCreated: '2026-04-24T15:32:00.000000+00:00'
+                    completedAt: '2026-04-24T15:35:11.222333+00:00'
+                    dueDate: '2026-04-25T23:00:00+00:00'
+                    internalId: claim_internal_002
+                    internalTag: march-batch
+                    modality: phone_only
+                    data_completeness: null
+                    error:
+                      errorCategory: NOT_FOUND
+                      errorCode: MEMBER_NOT_FOUND
+                      errorMessage: Member could not be located
+                    to: '+12125551234'
+                    transcript: 'SuperDial Agent: I''m calling to check on a claim for member BADID000.
+
+                      Representative: I''m sorry, I''m not finding any member with that ID...'
+                    recordingDownloadUrl: https://storage.googleapis.com/sd-recordings/.../recording.mp3?X-Goog-Signature=...
+                    callDuration: 00:04:11
+                    callSummary: Representative could not locate the member; lookup failed.
+                    callAuditSummary: Member ID was not found in the payer's system. Verified spelling and date of birth before disconnecting.
+                partial:
+                  summary: 'PARTIAL: the primary call succeeded but a follow-up call failed. `state: "PARTIAL"`, `results` holds the primary call''s fields, `missingFields` lists what the follow-up didn''t capture, `error` is `null`.'
+                  value:
+                    requestId: kT9bR2mP6nE3yV1xD7Aq
+                    requestBatchId: pH9kJ2lM4nB6vC8xZ7Qr
+                    schemaId: fWxzG4nqtpHsJxS5Lm3q
+                    requestType: claim-status
+                    state: PARTIAL
+                    inputs:
+                      payerName: Sample Insurance Co
+                      memberId: TEST555444333
+                      patientFirstName: Sample
+                      patientLastName: Patient
+                      patientDateOfBirth: '1990-01-15'
+                      beginningDateOfService: '2026-03-15'
+                      billingProviderName: Test Clinic LLC
+                      billingProviderTaxId: '999999999'
+                      renderingProviderName: Dr Test Provider
+                      renderingProviderNpi: '1234567890'
+                      claimChargeAmount: '150.00'
+                      phoneNumber: '2125551234'
+                    results:
+                      claimStatus: PAID
+                      paidAmount: '150.00'
+                    missingFields:
+                    - checkNumber
+                    - paidDate
+                    dateCreated: '2026-04-24T15:33:10.123000+00:00'
+                    completedAt: '2026-04-24T15:36:42.456000+00:00'
+                    dueDate: '2026-04-25T23:00:00+00:00'
+                    internalId: claim_internal_003
+                    internalTag: march-batch
+                    modality: digital_plus_phone
+                    data_completeness: null
+                    error: null
+                    to: '+12125551234'
+                    transcript: 'SuperDial Agent: I''m calling to check on a claim. Representative confirmed the claim is paid at $150.00.'
+                    recordingDownloadUrl: https://storage.googleapis.com/sd-recordings/.../recording.mp3?X-Goog-Signature=...
+                    callDuration: 00:06:24
+                    callSummary: Confirmed the claim is PAID for $150.00 on the primary call.
+                    callAuditSummary: Primary claim-status call succeeded; a follow-up call for the check number and paid date did not complete.
+                failureSystemError:
+                  summary: 'FAILURE: the dialed number reached the wrong line and the call couldn''t recover. `error.errorCategory` is `SYSTEM_ERROR`, `errorCode` is `OTHER`.'
+                  value:
+                    requestId: vM7gB4nC2pE9yU1xH3Tj
+                    requestBatchId: pH9kJ2lM4nB6vC8xZ7Qr
+                    schemaId: fWxzG4nqtpHsJxS5Lm3q
+                    requestType: claim-status
+                    state: FAILURE
+                    inputs:
+                      payerName: Sample Insurance Co
+                      memberId: TEST777888999
+                      patientFirstName: Sample
+                      patientLastName: Patient
+                      patientDateOfBirth: '1990-01-15'
+                      beginningDateOfService: '2026-03-15'
+                      billingProviderName: Test Clinic LLC
+                      billingProviderTaxId: '999999999'
+                      renderingProviderName: Dr Test Provider
+                      renderingProviderNpi: '1234567890'
+                      claimChargeAmount: '150.00'
+                    results: {}
+                    missingFields: []
+                    dateCreated: '2026-04-24T15:34:20.456000+00:00'
+                    completedAt: '2026-04-24T15:38:55.789000+00:00'
+                    dueDate: '2026-04-25T23:00:00+00:00'
+                    internalId: claim_internal_004
+                    internalTag: march-batch
+                    modality: phone_only
+                    data_completeness: null
+                    error:
+                      errorCategory: SYSTEM_ERROR
+                      errorCode: OTHER
+                      errorMessage: An error occurred while processing the request
+                    to: '+18005559999'
+                    transcript: 'SuperDial Agent: I''m calling about a claim. Representative: I''m sorry, you''ve reached the wrong department. This number isn''t for claims.'
+                    recordingDownloadUrl: https://storage.googleapis.com/sd-recordings/.../recording.mp3?X-Goog-Signature=...
+                    callDuration: 00:02:11
+                    callSummary: Reached wrong department; representative could not transfer.
+                    callAuditSummary: Dialed number routed to the wrong line; could not be transferred. Flagged for follow-up.
+                processing:
+                  summary: 'PROCESSING: request still running; no modality dispatched yet, no terminal data.'
+                  value:
+                    requestId: aC3hN5jD8eL1fM2gK6Yo
+                    requestBatchId: pH9kJ2lM4nB6vC8xZ7Qr
+                    schemaId: fWxzG4nqtpHsJxS5Lm3q
+                    requestType: claim-status
+                    state: PROCESSING
+                    inputs:
+                      payerName: Sample Insurance Co
+                      memberId: TEST987654321
+                      patientFirstName: Sample
+                      patientLastName: Patient
+                      patientDateOfBirth: '1990-01-15'
+                      beginningDateOfService: '2026-03-15'
+                      billingProviderName: Test Clinic LLC
+                      billingProviderTaxId: '999999999'
+                      renderingProviderName: Dr Test Provider
+                      renderingProviderNpi: '1234567890'
+                      claimChargeAmount: '150.00'
+                      phoneNumber: '2125551234'
+                    results: {}
+                    missingFields: []
+                    dateCreated: '2026-04-24T15:31:02.456789+00:00'
+                    completedAt: null
+                    dueDate: '2026-04-25T23:00:00+00:00'
+                    internalId: claim_internal_004
+                    internalTag: march-batch
+                    modality: null
+                    data_completeness: null
+                    error: null
+        '404':
+          description: Request not found, or account not found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              examples:
+                requestNotFound:
+                  summary: Request ID does not exist for this account
+                  value:
+                    error: REQUEST_NOT_FOUND
+                    message: No request with that ID exists for your account.
+                accountNotFound:
+                  summary: 'The API key resolves to an account that no longer exists. Rare: wrong-API-key cases hit `INVALID_API_KEY` at `/v1/auth` first.'
+                  value:
+                    error: ACCOUNT_NOT_FOUND
+                    message: No account is associated with this API key. Contact support if you believe this is an error.
+        '500':
+          description: Internal server error. Retry once; escalate if persistent.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                error: INTERNAL_ERROR
+                message: An internal error occurred. Please try again or contact support if the problem persists.
+        '401':
+          description: 'Unauthorized: enforced by the API gateway. Returned when the `Authorization: Bearer <token>` header is missing, malformed, or the token is invalid/expired.'
+          headers:
+            WWW-Authenticate:
+              description: Bearer realm and (when applicable) error code per RFC 6750.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GatewayErrorResponse'
+              examples:
+                missingAuth:
+                  summary: No Authorization header
+                  value:
+                    code: 401
+                    message: Jwt is missing
+                malformedJwt:
+                  summary: Authorization header value isn't a valid JWT
+                  value:
+                    code: 401
+                    message: Jwt is not in the form of Header.Payload.Signature with two dots and 3 sections
+      operationId: getV1RequestsByRequestId
+      x-operation-id-source: derived
+components:
+  schemas:
+    RequestResponse:
+      type: object
+      properties:
+        requestId:
+          type: string
+        requestBatchId:
+          type: string
+        schemaId:
+          type: string
+        requestType:
+          type: string
+        state:
+          type: string
+          enum:
+          - PROCESSING
+          - SUCCESS
+          - PARTIAL
+          - FAILURE
+          description: Request lifecycle state (uppercase). See [State](/guides/concepts#state) for what each value means and which response fields are populated for it.
+        inputs:
+          type: object
+        results:
+          type: object
+          description: Structured request output fields. Empty `{}` on `PROCESSING` and `FAILURE`; partially populated on `PARTIAL`; fully populated on `SUCCESS`.
+        missingFields:
+          type: array
+          items:
+            type: string
+          description: Schema fields the request was unable to obtain. Populated on `PARTIAL` and `FAILURE` requests where extraction ran but came up short.
+        dateCreated:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Time the request was created, ISO-8601 with UTC offset (e.g. `"2026-04-24T15:30:00.123456+00:00"`).
+        completedAt:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Time the request reached a terminal state (`SUCCESS`, `PARTIAL`, or `FAILURE`). `null` while the request is still `PROCESSING`.
+        dueDate:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Date this request is scheduled to run, as an ISO-8601 timestamp (e.g. `"2026-05-08T03:00:00+00:00"`). Set at submission time based on your account's daily call capacity and any work already pending. `null` when no due date is set.
+        internalId:
+          type:
+          - string
+          - 'null'
+          description: '**Optional.** Echoed back from the request body if you supplied one at create time. The key is always present in this response (as `null` when not supplied), unlike on webhook payloads where the key is omitted entirely.'
+        internalTag:
+          type:
+          - string
+          - 'null'
+          description: '**Optional.** Echoed back from the request body if you supplied one at create time. The key is always present in this response (as `null` when not supplied), unlike on webhook payloads where the key is omitted entirely.'
+        modality:
+          type:
+          - string
+          - 'null'
+          enum:
+          - digital_only
+          - phone_only
+          - digital_plus_phone
+          description: How the result was obtained. See [Modality](/guides/concepts#modality) for the value semantics. `phone_only` and `digital_plus_phone` both mean a phone call was placed (billable at the phone-call rate); `digital_only` means no phone call.
+        data_completeness:
+          type:
+          - string
+          - 'null'
+          enum:
+          - minimum
+          description: Completeness tier of a digital-only result. See [data_completeness](/guides/concepts#data_completeness) for current and reserved values.
+        error:
+          type:
+          - object
+          - 'null'
+          description: 'Structured error details. Populated on `FAILURE`; `null` on `PROCESSING`, `SUCCESS`, and `PARTIAL` (a `PARTIAL` request''s primary call effort succeeded, so it has no single failure cause: use `missingFields`). See [error object](/guides/concepts#error-object) for the schema and the full `errorCode` taxonomy.'
+          properties:
+            errorCategory:
+              type: string
+              enum:
+              - NOT_FOUND
+              - SYSTEM_ERROR
+              description: Two-bucket category. `NOT_FOUND` = the payer couldn't find what you asked about. `SYSTEM_ERROR` = any other failure (IVR navigation, payer refusal, unreachable, etc.).
+            errorCode:
+              type: string
+              description: 'Machine-readable failure code within the category. The taxonomy includes a small set of `SYSTEM_ERROR` codes (`IVR_FAILURE`, `PAYER_REFUSAL`, `UNABLE_TO_REACH_HUMAN_IN_TIME`, `REQUIRES_OTHER_CHANNEL`, `MATCHED_PHONE_NUMBER_INCORRECT`, `OTHER`), entity `NOT_FOUND` codes (`MEMBER_NOT_FOUND`, `PROVIDER_NOT_FOUND`, `CLAIM_NOT_FOUND`, `PRIOR_AUTH_NOT_FOUND`, `APPEAL_NOT_FOUND`), and two field-specific `NOT_FOUND` families: `{FIELD}_MISSING` (input not supplied) and `{FIELD}_INCORRECT` (input didn''t match payer records). An incorrect dialing number is attributed by where the number came from: SuperDial-looked-up (`MATCHED_PHONE_NUMBER_INCORRECT`, `SYSTEM_ERROR`) vs. caller-supplied (`INPUT_PHONE_NUMBER_INCORRECT`) or representative-referred (`REPRESENTATIVE_PHONE_NUMBER_INCORRECT`), both `NOT_FOUND`. See [errorCode](/guides/concepts#errorcode) for the complete enumeration. Existing codes won''t be renamed; new codes may be added over time. Default unknown values to `OTHER` in analytics.'
+            errorMessage:
+              type:
+              - string
+              - 'null'
+              description: Human-readable sentence describing what went wrong. Wording may change between releases; use `errorCode` for programmatic dispatch.
+        payerLookup:
+          $ref: '#/components/schemas/PayerLookup'
+          description: 'Payer/phone lookup for this request: the same six-field block returned on the `POST /v1/requests` create response. `phoneNumberToUse` is the number dialed; `phoneNumberSource` says where it came from. `matched*` fields are populated only when SuperDial dialed its own matched number.'
+        to:
+          type: string
+          description: The phone number that was actually dialed, echoed back in sanitized form. Present only once a representative phone call has completed (any terminal `state`), whether the number was one you supplied or one SuperDial resolved. Use `payerLookup.phoneNumberToUse` to see the intended number before a call completes.
+        transcript:
+          type: string
+          description: Full call transcript. Present only when a representative phone call has completed.
+        transcriptPostCall:
+          type: string
+          description: '**Optional.** Post-call transcript. Present only when a phone call has completed AND your account has post-call transcripts enabled. Contact your account team to turn this on.'
+        recordingDownloadUrl:
+          type: string
+          description: Signed URL for the call recording. Present only when a phone call has completed and a recording exists.
+        callDuration:
+          type: string
+          description: Call duration in `HH:MM:SS` format. Present only when a phone call has completed and recording length data exists.
+        callFromNumber:
+          type: string
+          description: '**Optional.** Outbound caller number (E.164): the line the call originated from. Present only when a phone call has completed AND your account has outbound-number visibility enabled. Contact your account team to turn this on.'
+        callSummary:
+          type: string
+          description: AI-generated call summary. Present only when a representative phone call has completed.
+        callAuditSummary:
+          type: string
+          description: AI-generated audit summary. Present only when a representative phone call has completed.
+        contributingCalls:
+          type:
+          - array
+          - 'null'
+          description: 'The individual phone calls behind this request''s `results`: one entry per call, in the order they were placed. This is the detailed counterpart to the `callSteps` summary: each entry carries that one call''s transcript, recording, duration, summary, and captured fields, plus a `call` sequence number and a `callStep` tying it to the step it belongs to. A request usually completes in one call but can take more (see [Calls behind a request](/guides/reading-requests#calls-behind-a-request)). Present only on the single-request read (`GET /v1/requests/{requestId}`) of a `SUCCESS` or `PARTIAL` request fulfilled by at least one phone call, a single-call request included. Omitted when no phone call produced a value (e.g. a `digital_only` result), and not returned by the list endpoint.'
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                description: Opaque, stable identifier for the contributing call.
+              call:
+                type: integer
+                description: Sequence number of this call within the request, starting at 1, in the order the calls were placed. `resultSources` points at this number to identify which call produced each field.
+              callStep:
+                type: string
+                description: The `key` of the `callSteps` entry this call belongs to.
+              to:
+                type:
+                - string
+                - 'null'
+                description: The number this call dialed. Present only when the step dialed a different number than the original call; omitted otherwise, and omitted when the number came from payer phone number lookup (dialing stays server-side).
+              transcript:
+                type:
+                - string
+                - 'null'
+                description: This call's transcript.
+              recordingDownloadUrl:
+                type:
+                - string
+                - 'null'
+                description: Signed URL for this call's recording, when one exists.
+              callDuration:
+                type:
+                - string
+                - 'null'
+                description: This call's duration in `HH:MM:SS` format.
+              callSummary:
+                type:
+                - string
+                - 'null'
+                description: AI-generated summary of this call.
+              callAuditSummary:
+                type:
+                - string
+                - 'null'
+                description: AI-generated audit summary of this call.
+              fieldsCaptured:
+                type: array
+                items:
+                  type: string
+                description: Schema field names whose final value in `results` came from this call. A field this call captured but whose final value came from another call or an electronic source is not listed here.
+              results:
+                type: object
+                description: 'What this call captured on its own: the same keys as the top-level `results`.'
+              completedAt:
+                type:
+                - string
+                - 'null'
+                description: When this call completed.
+        callSteps:
+          type:
+          - array
+          - 'null'
+          description: 'The steps SuperDial worked through to complete this request: a summary, one entry per step. Each step gathers one [schema](/guides/concepts#schema)''s fields and reports its own outcome. A request usually has a single step, but can have more, for example verifying benefits and then checking prior authorization on a separate call (see [Calls behind a request](/guides/reading-requests#calls-behind-a-request)). A single step can itself involve more than one call (a redial); `numContributingCalls` reports how many. This summarizes *what* was gathered; the captured values live in the top-level `results`, and the individual calls behind each step are in `contributingCalls` (tied back by `callStep`). Present on the single-request read (`GET /v1/requests/{requestId}`) of a completed phone request in any state: `SUCCESS`, `PARTIAL`, or `FAILURE`; the per-call `contributingCalls`/`resultSources` breakdown is added on `SUCCESS` and `PARTIAL`. Omitted for `digital_only` results, and not returned by the list endpoint.'
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+                description: Stable, human-readable identifier for this step within the request (a slug of the schema name, suffixed `-2`/`-3` when the same schema runs in more than one step). Referenced by `resultSources` and by `contributingCalls[].callStep`.
+              schemaId:
+                type:
+                - string
+                - 'null'
+                description: The schema this step gathered. Two steps that ran the same schema share `schemaId` but have distinct `key`. `null` if the step has no schema.
+              name:
+                type:
+                - string
+                - 'null'
+                description: Display name of that schema.
+              state:
+                type: string
+                enum:
+                - PROCESSING
+                - SUCCESS
+                - PARTIAL
+                - FAILURE
+                description: Outcome of this individual step. The request's overall state is the top-level `state`.
+              fieldsRequired:
+                type: integer
+                description: How many fields this step's schema required.
+              fieldsCaptured:
+                type: integer
+                description: How many of those required fields this step captured.
+              missingFields:
+                type: array
+                items:
+                  type: string
+                description: Required fields this step did not capture.
+              numContributingCalls:
+                type: integer
+                description: How many phone calls contributed a value to this step. When the per-call breakdown is present (a `SUCCESS` or `PARTIAL` request), these are the `contributingCalls` entries whose `callStep` is this step's `key`.
+              triggeredBy:
+                type:
+                - string
+                - 'null'
+                description: For a step that was opened off an earlier one, the `key` of that earlier step. `null` for the request's first step.
+        resultSources:
+          type:
+          - object
+          - 'null'
+          additionalProperties:
+            type: integer
+          description: Maps each field in `results` to the `call` number (`contributingCalls[].call`) of the phone call that produced its final value. Useful when a request spanned more than one call and you want to know which call each answer came from. Fields with no phone-call source (e.g. `digital_only` values) are omitted. Present alongside `contributingCalls` on the single-request read.
+      example:
+        requestId: 8bF7xK2mP9qR4sT6uV0w
+        requestBatchId: pH9kJ2lM4nB6vC8xZ7Qr
+        schemaId: fWxzG4nqtpHsJxS5Lm3q
+        requestType: claim-status
+        state: SUCCESS
+        inputs:
+          payerName: Sample Insurance Co
+          memberId: TEST123456789
+          providerNpi: '1234567890'
+          phoneNumber: '2125551234'
+          dateOfService: '2026-03-15'
+        results:
+          claimStatus: PAID
+          paidAmount: '150.00'
+          checkNumber: CHK998877
+          paidDate: '2026-04-10'
+        missingFields: []
+        dateCreated: '2026-04-24T15:30:00.123456+00:00'
+        completedAt: '2026-04-24T15:32:18.987654+00:00'
+        dueDate: '2026-04-25T23:00:00+00:00'
+        internalId: claim_internal_456
+        internalTag: march-batch
+        modality: phone_only
+        data_completeness: null
+        error: null
+        payerLookup:
+          inputPayerName: Sample Insurance Co
+          inputPhoneNumber: '2125551234'
+          matchedPayerName: null
+          matchedPayerPhone: null
+          phoneNumberToUse: '2125551234'
+          phoneNumberSource: input
+        to: '+12125551234'
+        transcript: 'SuperDial Agent: Hi, I''m calling to check on a claim status.
+
+          Representative: Sure, can I get the claim number?...'
+        recordingDownloadUrl: https://storage.googleapis.com/sd-recordings/.../recording.mp3?X-Goog-Signature=...
+        callDuration: 00:08:42
+        callSummary: 'Verified claim status as PAID. Check #CHK998877 issued on 2026-04-10 for $150.00.'
+        callAuditSummary: All claim status questions answered. Representative confirmed paid amount and check number.
+        callSteps:
+        - key: claim-status
+          schemaId: fWxzG4nqtpHsJxS5Lm3q
+          name: Claim Status
+          state: SUCCESS
+          fieldsRequired: 4
+          fieldsCaptured: 4
+          missingFields: []
+          numContributingCalls: 1
+          triggeredBy: null
+        contributingCalls:
+        - id: 9nQ4vT7xB2mK5pR8sL0w
+          call: 1
+          callStep: claim-status
+          fieldsCaptured:
+          - claimStatus
+          - paidAmount
+          - checkNumber
+          - paidDate
+          results:
+            claimStatus: PAID
+            paidAmount: '150.00'
+            checkNumber: CHK998877
+            paidDate: '2026-04-10'
+          completedAt: '2026-04-24T15:32:18.987654+00:00'
+        resultSources:
+          claimStatus: 1
+          paidAmount: 1
+          checkNumber: 1
+          paidDate: 1
+    CreateRequestBatchResponse:
+      type: object
+      description: Response from `POST /v1/requests` on a batch POST. Each entry in `requests` is positionally aligned with the input and is either a `CreateRequestSuccess` payload or an `ApiError` envelope. In the batch context, schema-not-found surfaces per-entry as `INVALID_REQUEST` (with `"Schema not found"` in `message`); the `SCHEMA_NOT_FOUND` error code only appears on single-item 404s.
+      required:
+      - requests
+      properties:
+        requests:
+          type: array
+          items:
+            oneOf:
+            - $ref: '#/components/schemas/CreateRequestSuccess'
+            - $ref: '#/components/schemas/ApiError'
+      example:
+        requests:
+        - requestId: 8bF7xK2mP9qR4sT6uV0w
+          requestBatchId: pH9kJ2lM4nB6vC8xZ7Qr
+          internalId: claim_001
+        - error: INVALID_REQUEST
+          message: schemaId is required
+    CreateRequestSuccess:
+      type: object
+      description: Success response from `POST /v1/requests` on a single-item POST. `internalId` is echoed only when supplied in the body. `payerLookup` is present on every created request when payer phone number lookup is enabled for the account (its `matched*` fields are `null` unless SuperDial dialed its own matched number).
+      required:
+      - requestId
+      - requestBatchId
+      properties:
+        requestId:
+          type: string
+          description: Server-generated request ID. Stable across idempotent retries with the same `internalId`. Use it on `GET /v1/requests/{requestId}` to fetch the full result.
+        requestBatchId:
+          type: string
+          description: Server-generated batch ID this request belongs to.
+        internalId:
+          type:
+          - string
+          - 'null'
+          description: '**Optional.** Echoed back from the request body if you supplied one.'
+        payerLookup:
+          $ref: '#/components/schemas/PayerLookup'
+      example:
+        requestId: 8bF7xK2mP9qR4sT6uV0w
+        requestBatchId: pH9kJ2lM4nB6vC8xZ7Qr
+        internalId: claim_internal_456
+    PayerLookup:
+      type: object
+      description: 'Payer/phone lookup outcome, returned on `POST /v1/requests` success responses and on the `GET /v1/requests` read endpoints. **Always present** on a created request when payer phone number lookup is enabled for your account. `phoneNumberToUse` is the number that will be dialed and `phoneNumberSource` says where it came from. The `matched*` fields are populated **only when SuperDial dials its own matched number** (you omitted `phoneNumber`, or set `useMatchedPayerPhone: true` and a match was found); when your supplied number is dialed they are `null` and `phoneNumberSource` is `input`. See the [Payer Phone Number Lookup guide](/guides/payer-resolution).'
+      required:
+      - inputPayerName
+      - inputPhoneNumber
+      - matchedPayerName
+      - matchedPayerPhone
+      - phoneNumberToUse
+      - phoneNumberSource
+      properties:
+        inputPayerName:
+          type:
+          - string
+          - 'null'
+          description: Echoes `inputs.payerName` from the request, verbatim. `null` when none was supplied.
+        inputPhoneNumber:
+          type:
+          - string
+          - 'null'
+          description: The `phoneNumber` you supplied in `inputs`, before any lookup. `null` when none was supplied.
+        matchedPayerName:
+          type:
+          - string
+          - 'null'
+          description: Canonical payer name SuperDial matched. `null` unless the matched payer's number was dialed. Compare against `inputPayerName` to confirm the match.
+        matchedPayerPhone:
+          type:
+          - string
+          - 'null'
+          description: Phone number of the matched payer. `null` unless it was the number dialed.
+        phoneNumberToUse:
+          type:
+          - string
+          - 'null'
+          description: The number that will actually be dialed. `null` when nothing is dialable.
+        phoneNumberSource:
+          type:
+          - string
+          - 'null'
+          enum:
+          - superdial
+          - phoneBook
+          - input
+          description: 'Origin of `phoneNumberToUse`: `superdial` is SuperDial''s payer directory, `phoneBook` is a per-client override configured for your account, `input` is the number you supplied. `null` when nothing is dialable.'
+    CreateRequestBatchPayload:
+      type: object
+      required:
+      - requests
+      properties:
+        requests:
+          type: array
+          minItems: 1
+          description: Non-empty array of request bodies. Empty arrays are rejected with HTTP 400.
+          items:
+            $ref: '#/components/schemas/CreateRequestPayload'
+      example:
+        requests:
+        - schemaId: fWxzG4nqtpHsJxS5Lm3q
+          inputs:
+            payerName: Sample Insurance Co
+            memberId: TEST123456789
+            phoneNumber: '2125551234'
+          internalId: claim_001
+        - schemaId: fWxzG4nqtpHsJxS5Lm3q
+          inputs:
+            payerName: Sample Insurance Co
+            memberId: TEST987654321
+            phoneNumber: '2125551234'
+          internalId: claim_002
+    ApiError:
+      type: object
+      description: Uniform error envelope returned by every non-2xx response from `/v1/requests` and `/v1/schemas`. The `error` field is a stable machine-readable code; the `message` field is a human-readable description safe to surface to end users; `details` (optional) carries the structured `missingInputs` / `invalidInputs` block on the `INVALID_INPUTS` path. Unmatched paths and unsupported HTTP methods fall back to the framework's default response (typically HTML); use a documented endpoint and method to receive this envelope.
+      required:
+      - error
+      - message
+      properties:
+        error:
+          type: string
+          enum:
+          - INVALID_REQUEST
+          - INVALID_INPUTS
+          - PAYER_NOT_FOUND
+          - ACCOUNT_NOT_FOUND
+          - SCHEMA_NOT_FOUND
+          - REQUEST_NOT_FOUND
+          - INTERNAL_ERROR
+          - PAYER_LOOKUP_FAILURE
+          - PAYER_REQUIRED_INPUTS_DISABLED
+          description: Machine-readable error code for the HTTP envelope. See [Creating a Request → Error handling](/guides/creating-a-request#error-handling) for what each code means, when it fires, and how to handle it.
+        message:
+          type: string
+          description: Human-readable error description. Never contains stack traces or internal identifiers.
+        details:
+          type: object
+          description: '**Optional.** Currently set only for `INVALID_INPUTS`, where it contains `missingInputs` (array of field names) and/or `invalidInputs` (object mapping field name to reason). See the [Input Validation](/guides/input-validation) guide for the full set of rules behind these reasons.'
+          properties:
+            missingInputs:
+              type: array
+              description: Field names that were required but absent, null, or empty/whitespace-only.
+              items:
+                type: string
+            invalidInputs:
+              type: object
+              description: Maps each rejected field name to a human-readable reason (e.g. `phoneNumber is not a valid U.S. phone number`, `claimChargeAmount is scientific notation`, `memberId contains invalid characters (curly braces)`, or a member-ID structure message).
+              additionalProperties:
+                type: string
+    GatewayErrorResponse:
+      type: object
+      description: 'Error envelope returned by the API Gateway for auth failures and routing errors. Distinct from the service''s own `ApiError` envelope: gateway responses use `{code, message}` because they''re produced before the request reaches the service.'
+      properties:
+        code:
+          type: integer
+          description: HTTP status code, repeated in the body.
+          example: 401
+        message:
+          type: string
+          description: Human-readable error message from the gateway.
+          example: Jwt is missing
+      required:
+      - code
+      - message
+    CreateRequestPayload:
+      type: object
+      required:
+      - schemaId
+      - inputs
+      properties:
+        schemaId:
+          type: string
+          description: Schema ID. Discover yours via `GET /v1/schemas`.
+        requestType:
+          type: string
+          description: '**Optional and ignored.** Historical field; the request type is derived server-side from the schema. You''ll see the canonical value on the `requestType` field of the `RequestResponse` returned by `GET /v1/requests/{requestId}`.'
+        inputs:
+          type: object
+          additionalProperties:
+            type: string
+          description: 'Inputs as a flat `{ key: value }` object: every value must be a string. The required and optional keys are schema-specific; discover them with `GET /v1/schemas/{schemaId}/required-inputs`. Each supplied value is format-checked by type (phone, date, dollar amount, boolean, regex-constrained string) and against two universal rules (no scientific notation, no curly braces); some accounts also enforce `memberId` structure and per-payer required inputs. Missing or format-invalid inputs return `INVALID_INPUTS` (400) with `details.missingInputs` and/or `details.invalidInputs`. See the [Input Validation](/guides/input-validation) guide for the full rule list, [Creating a Request](/guides/creating-a-request) for examples, and [Payer Phone Number Lookup](/guides/payer-resolution) for how omitting `phoneNumber` affects the response.'
+        webhookUrl:
+          type:
+          - string
+          - 'null'
+          description: '**Optional.** Per-request webhook URL override. Wins over the account-level webhook URL for this single request.'
+        useMatchedPayerPhone:
+          type:
+          - boolean
+          - 'null'
+          default: false
+          description: '**Optional.** When `true` and payer phone number lookup is enabled for your account, dial SuperDial''s matched payer number even if you supplied `phoneNumber`, falling back to your supplied number when no match is found (no error). When omitted or `false`, a supplied `phoneNumber` is always dialed as-is. Ignored when lookup is off. See [Payer Phone Number Lookup](/guides/payer-resolution#choosing-which-number-to-dial).'
+        internalId:
+          type:
+          - string
+          - 'null'
+          description: '**Optional** correlation ID that also serves as the request''s idempotency key. A retry with the same `internalId` does not create a new request: it returns the original `requestId` and the original `payerLookup` (if any), even if our payer data has changed since. Because it is the idempotency key, a value you supply **must be unique per distinct request**; reusing one silently returns the original request instead of starting new work. If you omit it, SuperDial generates and maintains its own unique key server-side, so you only need to supply one when you want to correlate results to your own records. See the Correlation and idempotency section in the Creating a Request guide.'
+        internalTag:
+          type:
+          - string
+          - 'null'
+          description: '**Optional.** Customer tag, echoed back on reads and webhooks. Useful for grouping requests without polluting your correlation IDs.'
+        aiOnly:
+          type:
+          - boolean
+          - 'null'
+          description: '**Optional.** When `true`, any phone call this request makes is handled only by our automated (AI) voice agent, never a human agent. Leaving it `false` adds no restriction: it does not force human-agent handling. Defaults to `false`.'
+        onshoreOnly:
+          type:
+          - boolean
+          - 'null'
+          description: '**Optional.** When `true`, all phone handling for this request is restricted to US-based agents. Leaving it `false` adds no restriction. Defaults to `false`.'
+      example:
+        schemaId: fWxzG4nqtpHsJxS5Lm3q
+        inputs:
+          payerName: Sample Insurance Co
+          memberId: TEST123456789
+          phoneNumber: '2125551234'
+          providerNpi: '1234567890'
+          dateOfService: '2026-03-15'
+        internalId: claim_internal_456
+        internalTag: march-batch
+        aiOnly: true
+        onshoreOnly: true
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: Robodialer-API-Key
+      description: Your SuperDial API key
+    apiSecret:
+      type: apiKey
+      in: header
+      name: Robodialer-API-Secret
+      description: Your SuperDial API secret
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token obtained from the /v1/auth endpoint

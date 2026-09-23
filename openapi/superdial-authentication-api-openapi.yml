@@ -1,0 +1,102 @@
+openapi: 3.2.0
+info:
+  description: SuperDial REST API Reference
+  version: 1.0.0
+  title: SuperDial Authentication API
+servers:
+- url: https://robodialer-service-api-9nc4t1p9.uc.gateway.dev
+  description: Production
+tags:
+- name: Authentication
+  description: 'SuperDial employs Bearer Authentication. Fetch a bearer token using your API Key and API Secret, then pass it as `Authorization: Bearer ` on subsequent calls.'
+paths:
+  /v1/auth:
+    get:
+      summary: Authenticate and get token
+      description: 'Returns a short-lived bearer token for use in API calls. The API key and API secret are **two distinct values** issued together: the key identifies your account, the secret authenticates the request.'
+      tags:
+      - Authentication
+      security:
+      - apiKey: []
+        apiSecret: []
+      x-codeSamples:
+      - lang: shell
+        label: curl
+        source: "curl https://robodialer-service-api-9nc4t1p9.uc.gateway.dev/v1/auth \\\n  -H 'Robodialer-API-Key: <your-api-key>' \\\n  -H 'Robodialer-API-Secret: <your-api-secret>'"
+      - lang: python
+        label: Python
+        source: "import requests\n\nr = requests.get(\n    'https://robodialer-service-api-9nc4t1p9.uc.gateway.dev/v1/auth',\n    headers={\n        'Robodialer-API-Key': '<your-api-key>',\n        'Robodialer-API-Secret': '<your-api-secret>',\n    },\n)\nr.raise_for_status()\ntoken = r.json()['token']"
+      - lang: javascript
+        label: JavaScript
+        source: "const r = await fetch(\n  'https://robodialer-service-api-9nc4t1p9.uc.gateway.dev/v1/auth',\n  {\n    headers: {\n      'Robodialer-API-Key': '<your-api-key>',\n      'Robodialer-API-Secret': '<your-api-secret>',\n    },\n  },\n);\nconst { token } = await r.json();"
+      responses:
+        '200':
+          description: Token returned successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+              example:
+                token: eyJhbGciOiJSUzI1NiIs...truncated...signature
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimpleErrorResponse'
+              examples:
+                missingApiKey:
+                  summary: Missing Robodialer-API-Key header
+                  value:
+                    error: MISSING_API_KEY
+                missingApiSecret:
+                  summary: Missing Robodialer-API-Secret header
+                  value:
+                    error: MISSING_API_SECRET
+                invalidApiKey:
+                  summary: API key not recognized
+                  value:
+                    error: INVALID_API_KEY
+                unauthorized:
+                  summary: Secret does not match the API key
+                  value:
+                    error: UNAUTHORIZED
+      operationId: getV1Auth
+      x-operation-id-source: derived
+components:
+  schemas:
+    AuthTokenResponse:
+      type: object
+      description: 'Response from `GET /v1/auth`. Contains a short-lived bearer token usable as `Authorization: Bearer <token>` on subsequent calls.'
+      required:
+      - token
+      properties:
+        token:
+          type: string
+          description: Short-lived bearer token (1-hour TTL).
+      example:
+        token: eyJhbGciOiJSUzI1NiIs...truncated...signature
+    SimpleErrorResponse:
+      type: object
+      description: Standard error envelope. The `error` field is a human-readable message describing what went wrong; per-endpoint examples are listed under each response.
+      properties:
+        error:
+          type: string
+          description: Human-readable error message.
+      required:
+      - error
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: Robodialer-API-Key
+      description: Your SuperDial API key
+    apiSecret:
+      type: apiKey
+      in: header
+      name: Robodialer-API-Secret
+      description: Your SuperDial API secret
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token obtained from the /v1/auth endpoint
