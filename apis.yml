@@ -44,6 +44,7 @@ tags:
 - Prior Authorization
 - Benefits Verification
 - Automation
+- A2A
 apis:
 - aid: superdial:superdial-authentication-api
   name: SuperDial Authentication API
@@ -178,3 +179,10 @@ x-enrichment:
   status: enriched
   artifacts_added: 24
   pass: local-v1
+x-a2a:
+  verified: true
+  probed: '2026-09-26'
+  url: "https://docs.superdial.com/.well-known/agent-card.json"
+  grade: "conformant"
+  protocol_version: "0.3"
+  control: 404

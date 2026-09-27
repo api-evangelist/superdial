@@ -65,6 +65,15 @@ paths:
       x-operation-id-source: derived
 components:
   schemas:
+    SimpleErrorResponse:
+      type: object
+      description: Standard error envelope. The `error` field is a human-readable message describing what went wrong; per-endpoint examples are listed under each response.
+      properties:
+        error:
+          type: string
+          description: Human-readable error message.
+      required:
+      - error
     AuthTokenResponse:
       type: object
       description: 'Response from `GET /v1/auth`. Contains a short-lived bearer token usable as `Authorization: Bearer <token>` on subsequent calls.'
@@ -76,15 +85,6 @@ components:
           description: Short-lived bearer token (1-hour TTL).
       example:
         token: eyJhbGciOiJSUzI1NiIs...truncated...signature
-    SimpleErrorResponse:
-      type: object
-      description: Standard error envelope. The `error` field is a human-readable message describing what went wrong; per-endpoint examples are listed under each response.
-      properties:
-        error:
-          type: string
-          description: Human-readable error message.
-      required:
-      - error
   securitySchemes:
     apiKey:
       type: apiKey

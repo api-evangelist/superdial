@@ -845,6 +845,21 @@ paths:
       x-operation-id-source: derived
 components:
   schemas:
+    GatewayErrorResponse:
+      type: object
+      description: 'Error envelope returned by the API Gateway for auth failures and routing errors. Distinct from the service''s own `ApiError` envelope: gateway responses use `{code, message}` because they''re produced before the request reaches the service.'
+      properties:
+        code:
+          type: integer
+          description: HTTP status code, repeated in the body.
+          example: 401
+        message:
+          type: string
+          description: Human-readable error message from the gateway.
+          example: Jwt is missing
+      required:
+      - code
+      - message
     RequestResponse:
       type: object
       properties:
@@ -1151,171 +1166,6 @@ components:
           paidAmount: 1
           checkNumber: 1
           paidDate: 1
-    CreateRequestBatchResponse:
-      type: object
-      description: Response from `POST /v1/requests` on a batch POST. Each entry in `requests` is positionally aligned with the input and is either a `CreateRequestSuccess` payload or an `ApiError` envelope. In the batch context, schema-not-found surfaces per-entry as `INVALID_REQUEST` (with `"Schema not found"` in `message`); the `SCHEMA_NOT_FOUND` error code only appears on single-item 404s.
-      required:
-      - requests
-      properties:
-        requests:
-          type: array
-          items:
-            oneOf:
-            - $ref: '#/components/schemas/CreateRequestSuccess'
-            - $ref: '#/components/schemas/ApiError'
-      example:
-        requests:
-        - requestId: 8bF7xK2mP9qR4sT6uV0w
-          requestBatchId: pH9kJ2lM4nB6vC8xZ7Qr
-          internalId: claim_001
-        - error: INVALID_REQUEST
-          message: schemaId is required
-    CreateRequestSuccess:
-      type: object
-      description: Success response from `POST /v1/requests` on a single-item POST. `internalId` is echoed only when supplied in the body. `payerLookup` is present on every created request when payer phone number lookup is enabled for the account (its `matched*` fields are `null` unless SuperDial dialed its own matched number).
-      required:
-      - requestId
-      - requestBatchId
-      properties:
-        requestId:
-          type: string
-          description: Server-generated request ID. Stable across idempotent retries with the same `internalId`. Use it on `GET /v1/requests/{requestId}` to fetch the full result.
-        requestBatchId:
-          type: string
-          description: Server-generated batch ID this request belongs to.
-        internalId:
-          type:
-          - string
-          - 'null'
-          description: '**Optional.** Echoed back from the request body if you supplied one.'
-        payerLookup:
-          $ref: '#/components/schemas/PayerLookup'
-      example:
-        requestId: 8bF7xK2mP9qR4sT6uV0w
-        requestBatchId: pH9kJ2lM4nB6vC8xZ7Qr
-        internalId: claim_internal_456
-    PayerLookup:
-      type: object
-      description: 'Payer/phone lookup outcome, returned on `POST /v1/requests` success responses and on the `GET /v1/requests` read endpoints. **Always present** on a created request when payer phone number lookup is enabled for your account. `phoneNumberToUse` is the number that will be dialed and `phoneNumberSource` says where it came from. The `matched*` fields are populated **only when SuperDial dials its own matched number** (you omitted `phoneNumber`, or set `useMatchedPayerPhone: true` and a match was found); when your supplied number is dialed they are `null` and `phoneNumberSource` is `input`. See the [Payer Phone Number Lookup guide](/guides/payer-resolution).'
-      required:
-      - inputPayerName
-      - inputPhoneNumber
-      - matchedPayerName
-      - matchedPayerPhone
-      - phoneNumberToUse
-      - phoneNumberSource
-      properties:
-        inputPayerName:
-          type:
-          - string
-          - 'null'
-          description: Echoes `inputs.payerName` from the request, verbatim. `null` when none was supplied.
-        inputPhoneNumber:
-          type:
-          - string
-          - 'null'
-          description: The `phoneNumber` you supplied in `inputs`, before any lookup. `null` when none was supplied.
-        matchedPayerName:
-          type:
-          - string
-          - 'null'
-          description: Canonical payer name SuperDial matched. `null` unless the matched payer's number was dialed. Compare against `inputPayerName` to confirm the match.
-        matchedPayerPhone:
-          type:
-          - string
-          - 'null'
-          description: Phone number of the matched payer. `null` unless it was the number dialed.
-        phoneNumberToUse:
-          type:
-          - string
-          - 'null'
-          description: The number that will actually be dialed. `null` when nothing is dialable.
-        phoneNumberSource:
-          type:
-          - string
-          - 'null'
-          enum:
-          - superdial
-          - phoneBook
-          - input
-          description: 'Origin of `phoneNumberToUse`: `superdial` is SuperDial''s payer directory, `phoneBook` is a per-client override configured for your account, `input` is the number you supplied. `null` when nothing is dialable.'
-    CreateRequestBatchPayload:
-      type: object
-      required:
-      - requests
-      properties:
-        requests:
-          type: array
-          minItems: 1
-          description: Non-empty array of request bodies. Empty arrays are rejected with HTTP 400.
-          items:
-            $ref: '#/components/schemas/CreateRequestPayload'
-      example:
-        requests:
-        - schemaId: fWxzG4nqtpHsJxS5Lm3q
-          inputs:
-            payerName: Sample Insurance Co
-            memberId: TEST123456789
-            phoneNumber: '2125551234'
-          internalId: claim_001
-        - schemaId: fWxzG4nqtpHsJxS5Lm3q
-          inputs:
-            payerName: Sample Insurance Co
-            memberId: TEST987654321
-            phoneNumber: '2125551234'
-          internalId: claim_002
-    ApiError:
-      type: object
-      description: Uniform error envelope returned by every non-2xx response from `/v1/requests` and `/v1/schemas`. The `error` field is a stable machine-readable code; the `message` field is a human-readable description safe to surface to end users; `details` (optional) carries the structured `missingInputs` / `invalidInputs` block on the `INVALID_INPUTS` path. Unmatched paths and unsupported HTTP methods fall back to the framework's default response (typically HTML); use a documented endpoint and method to receive this envelope.
-      required:
-      - error
-      - message
-      properties:
-        error:
-          type: string
-          enum:
-          - INVALID_REQUEST
-          - INVALID_INPUTS
-          - PAYER_NOT_FOUND
-          - ACCOUNT_NOT_FOUND
-          - SCHEMA_NOT_FOUND
-          - REQUEST_NOT_FOUND
-          - INTERNAL_ERROR
-          - PAYER_LOOKUP_FAILURE
-          - PAYER_REQUIRED_INPUTS_DISABLED
-          description: Machine-readable error code for the HTTP envelope. See [Creating a Request → Error handling](/guides/creating-a-request#error-handling) for what each code means, when it fires, and how to handle it.
-        message:
-          type: string
-          description: Human-readable error description. Never contains stack traces or internal identifiers.
-        details:
-          type: object
-          description: '**Optional.** Currently set only for `INVALID_INPUTS`, where it contains `missingInputs` (array of field names) and/or `invalidInputs` (object mapping field name to reason). See the [Input Validation](/guides/input-validation) guide for the full set of rules behind these reasons.'
-          properties:
-            missingInputs:
-              type: array
-              description: Field names that were required but absent, null, or empty/whitespace-only.
-              items:
-                type: string
-            invalidInputs:
-              type: object
-              description: Maps each rejected field name to a human-readable reason (e.g. `phoneNumber is not a valid U.S. phone number`, `claimChargeAmount is scientific notation`, `memberId contains invalid characters (curly braces)`, or a member-ID structure message).
-              additionalProperties:
-                type: string
-    GatewayErrorResponse:
-      type: object
-      description: 'Error envelope returned by the API Gateway for auth failures and routing errors. Distinct from the service''s own `ApiError` envelope: gateway responses use `{code, message}` because they''re produced before the request reaches the service.'
-      properties:
-        code:
-          type: integer
-          description: HTTP status code, repeated in the body.
-          example: 401
-        message:
-          type: string
-          description: Human-readable error message from the gateway.
-          example: Jwt is missing
-      required:
-      - code
-      - message
     CreateRequestPayload:
       type: object
       required:
@@ -1376,6 +1226,156 @@ components:
         internalTag: march-batch
         aiOnly: true
         onshoreOnly: true
+    PayerLookup:
+      type: object
+      description: 'Payer/phone lookup outcome, returned on `POST /v1/requests` success responses and on the `GET /v1/requests` read endpoints. **Always present** on a created request when payer phone number lookup is enabled for your account. `phoneNumberToUse` is the number that will be dialed and `phoneNumberSource` says where it came from. The `matched*` fields are populated **only when SuperDial dials its own matched number** (you omitted `phoneNumber`, or set `useMatchedPayerPhone: true` and a match was found); when your supplied number is dialed they are `null` and `phoneNumberSource` is `input`. See the [Payer Phone Number Lookup guide](/guides/payer-resolution).'
+      required:
+      - inputPayerName
+      - inputPhoneNumber
+      - matchedPayerName
+      - matchedPayerPhone
+      - phoneNumberToUse
+      - phoneNumberSource
+      properties:
+        inputPayerName:
+          type:
+          - string
+          - 'null'
+          description: Echoes `inputs.payerName` from the request, verbatim. `null` when none was supplied.
+        inputPhoneNumber:
+          type:
+          - string
+          - 'null'
+          description: The `phoneNumber` you supplied in `inputs`, before any lookup. `null` when none was supplied.
+        matchedPayerName:
+          type:
+          - string
+          - 'null'
+          description: Canonical payer name SuperDial matched. `null` unless the matched payer's number was dialed. Compare against `inputPayerName` to confirm the match.
+        matchedPayerPhone:
+          type:
+          - string
+          - 'null'
+          description: Phone number of the matched payer. `null` unless it was the number dialed.
+        phoneNumberToUse:
+          type:
+          - string
+          - 'null'
+          description: The number that will actually be dialed. `null` when nothing is dialable.
+        phoneNumberSource:
+          type:
+          - string
+          - 'null'
+          enum:
+          - superdial
+          - phoneBook
+          - input
+          description: 'Origin of `phoneNumberToUse`: `superdial` is SuperDial''s payer directory, `phoneBook` is a per-client override configured for your account, `input` is the number you supplied. `null` when nothing is dialable.'
+    CreateRequestSuccess:
+      type: object
+      description: Success response from `POST /v1/requests` on a single-item POST. `internalId` is echoed only when supplied in the body. `payerLookup` is present on every created request when payer phone number lookup is enabled for the account (its `matched*` fields are `null` unless SuperDial dialed its own matched number).
+      required:
+      - requestId
+      - requestBatchId
+      properties:
+        requestId:
+          type: string
+          description: Server-generated request ID. Stable across idempotent retries with the same `internalId`. Use it on `GET /v1/requests/{requestId}` to fetch the full result.
+        requestBatchId:
+          type: string
+          description: Server-generated batch ID this request belongs to.
+        internalId:
+          type:
+          - string
+          - 'null'
+          description: '**Optional.** Echoed back from the request body if you supplied one.'
+        payerLookup:
+          $ref: '#/components/schemas/PayerLookup'
+      example:
+        requestId: 8bF7xK2mP9qR4sT6uV0w
+        requestBatchId: pH9kJ2lM4nB6vC8xZ7Qr
+        internalId: claim_internal_456
+    ApiError:
+      type: object
+      description: Uniform error envelope returned by every non-2xx response from `/v1/requests` and `/v1/schemas`. The `error` field is a stable machine-readable code; the `message` field is a human-readable description safe to surface to end users; `details` (optional) carries the structured `missingInputs` / `invalidInputs` block on the `INVALID_INPUTS` path. Unmatched paths and unsupported HTTP methods fall back to the framework's default response (typically HTML); use a documented endpoint and method to receive this envelope.
+      required:
+      - error
+      - message
+      properties:
+        error:
+          type: string
+          enum:
+          - INVALID_REQUEST
+          - INVALID_INPUTS
+          - PAYER_NOT_FOUND
+          - ACCOUNT_NOT_FOUND
+          - SCHEMA_NOT_FOUND
+          - REQUEST_NOT_FOUND
+          - INTERNAL_ERROR
+          - PAYER_LOOKUP_FAILURE
+          - PAYER_REQUIRED_INPUTS_DISABLED
+          description: Machine-readable error code for the HTTP envelope. See [Creating a Request → Error handling](/guides/creating-a-request#error-handling) for what each code means, when it fires, and how to handle it.
+        message:
+          type: string
+          description: Human-readable error description. Never contains stack traces or internal identifiers.
+        details:
+          type: object
+          description: '**Optional.** Currently set only for `INVALID_INPUTS`, where it contains `missingInputs` (array of field names) and/or `invalidInputs` (object mapping field name to reason). See the [Input Validation](/guides/input-validation) guide for the full set of rules behind these reasons.'
+          properties:
+            missingInputs:
+              type: array
+              description: Field names that were required but absent, null, or empty/whitespace-only.
+              items:
+                type: string
+            invalidInputs:
+              type: object
+              description: Maps each rejected field name to a human-readable reason (e.g. `phoneNumber is not a valid U.S. phone number`, `claimChargeAmount is scientific notation`, `memberId contains invalid characters (curly braces)`, or a member-ID structure message).
+              additionalProperties:
+                type: string
+    CreateRequestBatchResponse:
+      type: object
+      description: Response from `POST /v1/requests` on a batch POST. Each entry in `requests` is positionally aligned with the input and is either a `CreateRequestSuccess` payload or an `ApiError` envelope. In the batch context, schema-not-found surfaces per-entry as `INVALID_REQUEST` (with `"Schema not found"` in `message`); the `SCHEMA_NOT_FOUND` error code only appears on single-item 404s.
+      required:
+      - requests
+      properties:
+        requests:
+          type: array
+          items:
+            oneOf:
+            - $ref: '#/components/schemas/CreateRequestSuccess'
+            - $ref: '#/components/schemas/ApiError'
+      example:
+        requests:
+        - requestId: 8bF7xK2mP9qR4sT6uV0w
+          requestBatchId: pH9kJ2lM4nB6vC8xZ7Qr
+          internalId: claim_001
+        - error: INVALID_REQUEST
+          message: schemaId is required
+    CreateRequestBatchPayload:
+      type: object
+      required:
+      - requests
+      properties:
+        requests:
+          type: array
+          minItems: 1
+          description: Non-empty array of request bodies. Empty arrays are rejected with HTTP 400.
+          items:
+            $ref: '#/components/schemas/CreateRequestPayload'
+      example:
+        requests:
+        - schemaId: fWxzG4nqtpHsJxS5Lm3q
+          inputs:
+            payerName: Sample Insurance Co
+            memberId: TEST123456789
+            phoneNumber: '2125551234'
+          internalId: claim_001
+        - schemaId: fWxzG4nqtpHsJxS5Lm3q
+          inputs:
+            payerName: Sample Insurance Co
+            memberId: TEST987654321
+            phoneNumber: '2125551234'
+          internalId: claim_002
   securitySchemes:
     apiKey:
       type: apiKey
