@@ -324,113 +324,6 @@ paths:
       x-operation-id-source: derived
 components:
   schemas:
-    RequiredInputsResponse:
-      type: object
-      description: 'Success response from `GET /v1/schemas/{schemaId}/required-inputs`. Carries both required and optional input field lists; the two are disjoint: if a name is required by any source, it appears only in `requiredInputs.fields`.'
-      required:
-      - schemaId
-      - requiredInputs
-      - optionalInputs
-      properties:
-        schemaId:
-          type: string
-          description: Echoes the path parameter.
-        requiredInputs:
-          type: object
-          required:
-          - fields
-          properties:
-            fields:
-              type: array
-              items:
-                type: string
-              description: 'Sorted list of required input field names. Use these as the keys of the `inputs` object on `POST /v1/requests`. Returned verbatim: the names are exactly what the request validator expects. This is the baseline; with per-payer required inputs enabled, some payers require additional fields not listed here.'
-        optionalInputs:
-          type: object
-          required:
-          - fields
-          properties:
-            fields:
-              type: array
-              items:
-                type: string
-              description: Sorted list of optional input field names, accepted but not required by `POST /v1/requests`. Disjoint from `requiredInputs.fields`.
-    GatewayErrorResponse:
-      type: object
-      description: 'Error envelope returned by the API Gateway for auth failures and routing errors. Distinct from the service''s own `ApiError` envelope: gateway responses use `{code, message}` because they''re produced before the request reaches the service.'
-      properties:
-        code:
-          type: integer
-          description: HTTP status code, repeated in the body.
-          example: 401
-        message:
-          type: string
-          description: Human-readable error message from the gateway.
-          example: Jwt is missing
-      required:
-      - code
-      - message
-    MatchedPayerEntry:
-      type: object
-      description: 'A `payers[]` entry for a name that resolved to a canonical payer. The resolved phone number is intentionally omitted: dialing happens server-side and is never echoed back.'
-      required:
-      - inputPayerName
-      - matchedPayerName
-      - payerRequiredInputs
-      properties:
-        inputPayerName:
-          type: string
-          description: Echoes the requested name (trimmed of surrounding whitespace), verbatim.
-        matchedPayerName:
-          type: string
-          description: Canonical payer name SuperDial matched. Compare against `inputPayerName` to confirm the match landed where you expected.
-        payerRequiredInputs:
-          type: object
-          required:
-          - fields
-          properties:
-            fields:
-              type: array
-              items:
-                type: string
-              description: Sorted list of the **additional** required-input field names this payer needs, beyond the schema-level `requiredInputs.fields`, not the full set (it may be empty when the payer adds nothing). Union it with `requiredInputs.fields` to get everything a request for this payer must supply to avoid an `INVALID_INPUTS` rejection.
-    ApiError:
-      type: object
-      description: Uniform error envelope returned by every non-2xx response from `/v1/requests` and `/v1/schemas`. The `error` field is a stable machine-readable code; the `message` field is a human-readable description safe to surface to end users; `details` (optional) carries the structured `missingInputs` / `invalidInputs` block on the `INVALID_INPUTS` path. Unmatched paths and unsupported HTTP methods fall back to the framework's default response (typically HTML); use a documented endpoint and method to receive this envelope.
-      required:
-      - error
-      - message
-      properties:
-        error:
-          type: string
-          enum:
-          - INVALID_REQUEST
-          - INVALID_INPUTS
-          - PAYER_NOT_FOUND
-          - ACCOUNT_NOT_FOUND
-          - SCHEMA_NOT_FOUND
-          - REQUEST_NOT_FOUND
-          - INTERNAL_ERROR
-          - PAYER_LOOKUP_FAILURE
-          - PAYER_REQUIRED_INPUTS_DISABLED
-          description: Machine-readable error code for the HTTP envelope. See [Creating a Request → Error handling](/guides/creating-a-request#error-handling) for what each code means, when it fires, and how to handle it.
-        message:
-          type: string
-          description: Human-readable error description. Never contains stack traces or internal identifiers.
-        details:
-          type: object
-          description: '**Optional.** Currently set only for `INVALID_INPUTS`, where it contains `missingInputs` (array of field names) and/or `invalidInputs` (object mapping field name to reason). See the [Input Validation](/guides/input-validation) guide for the full set of rules behind these reasons.'
-          properties:
-            missingInputs:
-              type: array
-              description: Field names that were required but absent, null, or empty/whitespace-only.
-              items:
-                type: string
-            invalidInputs:
-              type: object
-              description: Maps each rejected field name to a human-readable reason (e.g. `phoneNumber is not a valid U.S. phone number`, `claimChargeAmount is scientific notation`, `memberId contains invalid characters (curly braces)`, or a member-ID structure message).
-              additionalProperties:
-                type: string
     SchemaSummary:
       type: object
       description: One row in the `GET /v1/schemas` response.
@@ -448,38 +341,38 @@ components:
         requestType:
           type: string
           description: The kind of extraction this schema produces (e.g. `vob`, `claim-status`). Server-derived; surfaces on `RequestResponse.requestType` after the request runs. You don't need to pass it on `POST /v1/requests`.
-    PayerInputError:
+    GatewayErrorResponse:
       type: object
-      description: 'A `payers[]` entry for a name that could not be resolved. This is an inline, per-payer error: it does not fail the whole request. Distinguished from `MatchedPayerEntry` by the presence of `errorCode`.'
-      required:
-      - inputPayerName
-      - errorCode
-      - message
+      description: 'Error envelope returned by the API Gateway for auth failures and routing errors. Distinct from the service''s own `ApiError` envelope: gateway responses use `{code, message}` because they''re produced before the request reaches the service.'
       properties:
-        inputPayerName:
-          type: string
-          description: Echoes the requested name, verbatim (empty string when the input was blank/whitespace-only).
-        errorCode:
-          type: string
-          enum:
-          - INVALID_PAYER_NAME
-          - PAYER_NOT_FOUND
-          - PAYER_LOOKUP_FAILURE
-          description: '`INVALID_PAYER_NAME`: the entry was blank/whitespace-only, so no lookup ran. `PAYER_NOT_FOUND`: no canonical payer matched the name. `PAYER_LOOKUP_FAILURE`: the lookup errored transiently; retry that name. These codes are scoped to this array and are distinct from the whole-request `{error, message}` envelope.'
+        code:
+          type: integer
+          description: HTTP status code, repeated in the body.
+          example: 401
         message:
           type: string
-          description: Human-readable description of the per-payer failure.
-    ListSchemasResponse:
-      type: object
-      description: Success response from `GET /v1/schemas`.
+          description: Human-readable error message from the gateway.
+          example: Jwt is missing
       required:
-      - schemas
+      - code
+      - message
+    RequiredPayerInputsRequest:
+      type: object
+      description: Request body for `POST /v1/schemas/{schemaId}/required-payer-inputs`.
+      required:
+      - payerNames
       properties:
-        schemas:
+        payerNames:
           type: array
+          minItems: 1
+          maxItems: 50
           items:
-            $ref: '#/components/schemas/SchemaSummary'
-          description: Schemas that have been retired or hidden for your account are filtered out of this list.
+            type: string
+          description: Payer names to resolve, 1–50 per request. Resolved independently, in order, with no de-duplication. The response's `payers` array is positionally aligned 1:1 with this array. More than 50 entries returns 400 `INVALID_REQUEST` (no truncation). A blank/whitespace-only entry is not a whole-request error. It comes back as a per-payer `INVALID_PAYER_NAME` entry in `payers`.
+      example:
+        payerNames:
+        - Sample Insurance Co
+        - Unknown Payer
     RequiredPayerInputsResponse:
       type: object
       description: Success body from `POST /v1/schemas/{schemaId}/required-payer-inputs`. Carries the schema's own `requiredInputs`/`optionalInputs` (identical shape and semantics to `GET /v1/schemas/{schemaId}/required-inputs`) plus a `payers` array with one entry per requested name.
@@ -519,23 +412,130 @@ components:
             oneOf:
             - $ref: '#/components/schemas/MatchedPayerEntry'
             - $ref: '#/components/schemas/PayerInputError'
-    RequiredPayerInputsRequest:
+    ListSchemasResponse:
       type: object
-      description: Request body for `POST /v1/schemas/{schemaId}/required-payer-inputs`.
+      description: Success response from `GET /v1/schemas`.
       required:
-      - payerNames
+      - schemas
       properties:
-        payerNames:
+        schemas:
           type: array
-          minItems: 1
-          maxItems: 50
           items:
-            type: string
-          description: Payer names to resolve, 1–50 per request. Resolved independently, in order, with no de-duplication. The response's `payers` array is positionally aligned 1:1 with this array. More than 50 entries returns 400 `INVALID_REQUEST` (no truncation). A blank/whitespace-only entry is not a whole-request error. It comes back as a per-payer `INVALID_PAYER_NAME` entry in `payers`.
-      example:
-        payerNames:
-        - Sample Insurance Co
-        - Unknown Payer
+            $ref: '#/components/schemas/SchemaSummary'
+          description: Schemas that have been retired or hidden for your account are filtered out of this list.
+    PayerInputError:
+      type: object
+      description: 'A `payers[]` entry for a name that could not be resolved. This is an inline, per-payer error: it does not fail the whole request. Distinguished from `MatchedPayerEntry` by the presence of `errorCode`.'
+      required:
+      - inputPayerName
+      - errorCode
+      - message
+      properties:
+        inputPayerName:
+          type: string
+          description: Echoes the requested name, verbatim (empty string when the input was blank/whitespace-only).
+        errorCode:
+          type: string
+          enum:
+          - INVALID_PAYER_NAME
+          - PAYER_NOT_FOUND
+          - PAYER_LOOKUP_FAILURE
+          description: '`INVALID_PAYER_NAME`: the entry was blank/whitespace-only, so no lookup ran. `PAYER_NOT_FOUND`: no canonical payer matched the name. `PAYER_LOOKUP_FAILURE`: the lookup errored transiently; retry that name. These codes are scoped to this array and are distinct from the whole-request `{error, message}` envelope.'
+        message:
+          type: string
+          description: Human-readable description of the per-payer failure.
+    MatchedPayerEntry:
+      type: object
+      description: 'A `payers[]` entry for a name that resolved to a canonical payer. The resolved phone number is intentionally omitted: dialing happens server-side and is never echoed back.'
+      required:
+      - inputPayerName
+      - matchedPayerName
+      - payerRequiredInputs
+      properties:
+        inputPayerName:
+          type: string
+          description: Echoes the requested name (trimmed of surrounding whitespace), verbatim.
+        matchedPayerName:
+          type: string
+          description: Canonical payer name SuperDial matched. Compare against `inputPayerName` to confirm the match landed where you expected.
+        payerRequiredInputs:
+          type: object
+          required:
+          - fields
+          properties:
+            fields:
+              type: array
+              items:
+                type: string
+              description: Sorted list of the **additional** required-input field names this payer needs, beyond the schema-level `requiredInputs.fields`, not the full set (it may be empty when the payer adds nothing). Union it with `requiredInputs.fields` to get everything a request for this payer must supply to avoid an `INVALID_INPUTS` rejection.
+    RequiredInputsResponse:
+      type: object
+      description: 'Success response from `GET /v1/schemas/{schemaId}/required-inputs`. Carries both required and optional input field lists; the two are disjoint: if a name is required by any source, it appears only in `requiredInputs.fields`.'
+      required:
+      - schemaId
+      - requiredInputs
+      - optionalInputs
+      properties:
+        schemaId:
+          type: string
+          description: Echoes the path parameter.
+        requiredInputs:
+          type: object
+          required:
+          - fields
+          properties:
+            fields:
+              type: array
+              items:
+                type: string
+              description: 'Sorted list of required input field names. Use these as the keys of the `inputs` object on `POST /v1/requests`. Returned verbatim: the names are exactly what the request validator expects. This is the baseline; with per-payer required inputs enabled, some payers require additional fields not listed here.'
+        optionalInputs:
+          type: object
+          required:
+          - fields
+          properties:
+            fields:
+              type: array
+              items:
+                type: string
+              description: Sorted list of optional input field names, accepted but not required by `POST /v1/requests`. Disjoint from `requiredInputs.fields`.
+    ApiError:
+      type: object
+      description: Uniform error envelope returned by every non-2xx response from `/v1/requests` and `/v1/schemas`. The `error` field is a stable machine-readable code; the `message` field is a human-readable description safe to surface to end users; `details` (optional) carries the structured `missingInputs` / `invalidInputs` block on the `INVALID_INPUTS` path. Unmatched paths and unsupported HTTP methods fall back to the framework's default response (typically HTML); use a documented endpoint and method to receive this envelope.
+      required:
+      - error
+      - message
+      properties:
+        error:
+          type: string
+          enum:
+          - INVALID_REQUEST
+          - INVALID_INPUTS
+          - PAYER_NOT_FOUND
+          - ACCOUNT_NOT_FOUND
+          - SCHEMA_NOT_FOUND
+          - REQUEST_NOT_FOUND
+          - INTERNAL_ERROR
+          - PAYER_LOOKUP_FAILURE
+          - PAYER_REQUIRED_INPUTS_DISABLED
+          description: Machine-readable error code for the HTTP envelope. See [Creating a Request → Error handling](/guides/creating-a-request#error-handling) for what each code means, when it fires, and how to handle it.
+        message:
+          type: string
+          description: Human-readable error description. Never contains stack traces or internal identifiers.
+        details:
+          type: object
+          description: '**Optional.** Currently set only for `INVALID_INPUTS`, where it contains `missingInputs` (array of field names) and/or `invalidInputs` (object mapping field name to reason). See the [Input Validation](/guides/input-validation) guide for the full set of rules behind these reasons.'
+          properties:
+            missingInputs:
+              type: array
+              description: Field names that were required but absent, null, or empty/whitespace-only.
+              items:
+                type: string
+            invalidInputs:
+              type: object
+              description: Maps each rejected field name to a human-readable reason (e.g. `phoneNumber is not a valid U.S. phone number`, `claimChargeAmount is scientific notation`, `memberId contains invalid characters (curly braces)`, or a member-ID structure message).
+              additionalProperties:
+                type: string
   securitySchemes:
     apiKey:
       type: apiKey
