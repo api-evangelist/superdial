@@ -64,5 +64,127 @@
 > Full detail: **[Where this data comes from](https://apievangelist.com/about/where-our-data-comes-from)**
 <!-- API-EVANGELIST-PROVENANCE:END -->
 
-SuperDial is a company surfaced via the API Evangelist harvest backlog (source: secondary-market) and added to the network as a stub for full-pipeline profiling.
-- https://www.nasdaqprivatemarket.com/
+SuperDial builds voice AI agents that automate high-friction administrative phone calls in healthcare revenue cycle management. Its agents place outbound calls from providers, billing teams and RCM companies to insurance payers — navigating IVR phone trees, holding, and conducting live conversations with payer representatives — and return structured, auditable results. Common workflows include benefits verification, prior authorization, claim status, provider data validation, and credentialing and enrollment outreach. The SuperDial API exposes this as an asynchronous job API: a client submits a "request" against an account-provisioned schema, SuperDial fulfills it across digital and phone modalities, and delivers the structured result by signed webhook or polling. Founded in 2021 in San Francisco as SuperBill by Stanford classmates Sam Schwager and Harrison Caruthers, the company raised a $15M Series A led by SignalFire in 2025.
+
+**Areas:** Company · Healthcare · Revenue Cycle Management · Voice AI · Insurance · Artificial Intelligence · Claims · Prior Authorization · Benefits Verification · Automation · A2A
+
+## SuperDial on APIs.io
+
+Everything profiled for SuperDial is published on APIs.io rather than in this repository. Start at the provider page — **[apis.io/providers/superdial/](https://apis.io/providers/superdial/)** — or go straight to one of the APIs or properties below.
+
+### APIs (3)
+
+- [SuperDial Authentication API](https://apis.io/apis/superdial/superdial-authentication-api/) — SuperDial employs Bearer Authentication. Fetch a bearer token using your API Key and API Secret, then pass it as `Authorization: Bearer <token>` on…
+- [SuperDial Requests API](https://apis.io/apis/superdial/superdial-requests-api/) — Endpoints for creating and reading requests (structured data extraction jobs). All non-2xx responses use the uniform `{error, message, [details]}` envelope…
+- [SuperDial Schemas API](https://apis.io/apis/superdial/superdial-schemas-api/) — Discover the schemas provisioned for your account and the required input keys for each. All non-2xx responses use the uniform `{error, message, [details]}`…
+
+### Published properties
+
+Each property below is a page on APIs.io carrying the machine-readable artifact and what it says.
+
+#### AsyncAPI (1)
+
+Event-driven and webhook contracts.
+
+- [Superdial Requests Webhooks](https://apis.io/asyncapis/superdial/superdial-requests-webhooks/)
+
+#### MCP servers (1)
+
+Model Context Protocol servers that expose the API to agents.
+
+- [SuperDial API Documentation MCP Server](https://apis.io/servers/superdial/superdial-api-documentation-mcp-server/)
+
+#### Overlays (1)
+
+OpenAPI overlays, including conversational phrasing for each operation.
+
+- [Superdial Api Overlay](https://apis.io/overlays/superdial/superdial-api-overlay/)
+
+#### Security (3)
+
+Authentication, trust centre, and vulnerability disclosure.
+
+- [Superdial Authentication](https://apis.io/security/superdial/superdial-authentication/)
+- [Superdial Domain Security](https://apis.io/security/superdial/superdial-domain-security/)
+- [Superdial Trust Center](https://apis.io/security/superdial/superdial-trust-center/)
+
+#### Plans and pricing (1)
+
+Published plans, tiers and prices.
+
+- [Superdial Plans Pricing](https://apis.io/plans/superdial/superdial-plans-pricing/)
+
+#### Rate limits (1)
+
+Published request limits.
+
+- [Superdial Rate Limits](https://apis.io/rate-limits/superdial/superdial-rate-limits/)
+
+## Where to find this API
+
+Links to the company's own pages. This repository publishes no copy of their specifications — the canonical document is theirs and lives at the URLs below.
+
+- [Website](https://www.superdial.com/)
+- [Documentation](https://docs.superdial.com/introduction)
+- [Getting started](https://docs.superdial.com/guides/creating-a-request)
+- [API reference](https://docs.superdial.com/api-reference/requests/create-a-request)
+- [Sign up](https://app.thesuperbill.com/super-dial-sign-in)
+- [Blog](https://www.superdial.com/blog)
+- [Trust centre](https://app.vanta.com/thesuperbill.com/trust/yxpg5guedf5rle15cka4ab)
+- [Terms of service](https://www.superdial.com/terms)
+- [Privacy policy](https://www.superdial.com/privacy)
+
+## API Evangelist rating
+
+**Kin Score 44.4** — developing · rubric 0.25.0 · scored 2026-10-23
+
+| Facet | Score |
+|---|---|
+| Discoverability | 75.0 |
+| Contract quality | 58.8 |
+| Contract governance | 18.2 |
+| Operational transparency | 7.9 |
+| Developer ergonomics | 66.7 |
+| Access clarity | 28.9 |
+
+**Agent readiness 43.3** — agent-native
+
+| Agent-readiness dimension | Result |
+|---|---|
+| Spec Presence | yes |
+| Agentic Access | — |
+| Reversibility Documented | — |
+| MCP Server | platform (partial credit) |
+| Auth Clarity | bearer (partial credit) |
+| Idempotency | documented (partial credit) |
+| Error Semantics | verified |
+| OpenAPI Examples | verified |
+| Rate Limit Signal | documented (partial credit) |
+| Event Surface Described | yes |
+| Agent Skills | yes |
+| Well Known Catalog | — |
+| Consent Identity | — |
+| Agent Card | — |
+| Dry Run Mode | — |
+| Delegated Identity | — |
+| Protected Resource Metadata | — |
+| Dynamic Client Registration | — |
+| Agentic Commerce | — |
+| Pagination Ratio | na |
+| Operation Distinctiveness | distinct |
+
+**Regulatory alignment 20.5** — Insurance
+
+The rubric is published at [github.com/api-evangelist/kin-score](https://github.com/api-evangelist/kin-score). The per-check breakdown behind these numbers — which checks were earned, partial or missed — along with score history and how this provider compares to its peers, is available at [apis.io/providers/superdial/](https://apis.io/providers/superdial/).
+
+## How this profile is made
+
+API Evangelist profiles a company's public API surface the way a developer would find it: the website, developer portal and documentation, the specifications it publishes, its public repositories, and its pricing, status and changelog pages. From that it derives the properties above — contracts split per API, workflows, schemas, collections, governance rules, plans and rate limits — and scores them against the published [Kin Score rubric](https://github.com/api-evangelist/kin-score).
+
+The artifacts are published on [APIs.io](https://apis.io), not in this repository. This repository is the public record for SuperDial: the place to say something is wrong, missing or out of date, and to ask for a re-score or a removal.
+
+## Open an issue
+
+- **Something about this listing** — a wrong description, a missing API, a stale artifact or a question about the rating: [open an issue on this repository](https://github.com/api-evangelist/superdial/issues/new).
+- **A new API, or one that is not in the catalog yet** — [submit it on APIs.io](https://apis.io/add/).
+- **Anything else** — [the APIs.io inbox](https://github.com/api-search/inbox/issues/new) or [info@apievangelist.com](mailto:info@apievangelist.com).
